@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from app.models.common import Model, NonNegative, Positive, Vehicle
+from app.calibration.profiles import SimulationProfile
 
 
 class Range(Model):
@@ -79,9 +80,12 @@ class ShiftConfig(Model):
     start_location_zone: int = Field(strict=True)
     # Explicitly separate simulator assumptions from the four official fields.
     simulation: SyntheticConfig = Field(default_factory=SyntheticConfig)
+    profile: SimulationProfile | None = None
 
     @model_validator(mode="after")
     def valid_shift(self):
+        if self.profile and any(max(t.pickup, t.dropoff) > self.simulation.zone_count for t in self.profile.zone_transition_distribution):
+            raise ValueError("Profile zones exceed configured zone_count")
         if not 1 <= self.start_location_zone <= self.simulation.zone_count:
             raise ValueError("start_location_zone must be within synthetic zone_count")
         try:

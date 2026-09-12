@@ -21,11 +21,11 @@ class Evaluation:
 
 
 class DecisionEngine:
-    def evaluate(self, order: DecideRequest, snapshot: StrategySnapshot) -> Evaluation:
+    def evaluate(self, order: DecideRequest, snapshot: StrategySnapshot, plan: WorkPlan | None = None) -> Evaluation:
         start = perf_counter_ns()
         state = resolve_state(order.sim_time, order.courier_state_overrides,
                               snapshot.policy.default_shift_hours)
-        plan = build_work_plan(order, state, snapshot)
+        plan = plan or build_work_plan(order, state, snapshot)
         violation = evaluate_constraints(order, state, snapshot, plan)
         economics = None
         if violation:
@@ -50,10 +50,10 @@ class DecisionService:
         self.log = log
         self.engine = DecisionEngine()
 
-    def decide(self, order: DecideRequest, started_ns: int | None = None) -> DecideResponse:
+    def decide(self, order: DecideRequest, started_ns: int | None = None, plan: WorkPlan | None = None) -> DecideResponse:
         start = started_ns if started_ns is not None else perf_counter_ns()
         snapshot = self.strategies.get()  # One coherent snapshot per decision.
-        result = self.engine.evaluate(order, snapshot)
+        result = self.engine.evaluate(order, snapshot) if plan is None else self.engine.evaluate(order, snapshot, plan)
         response, state, plan = result.response, result.state, result.plan
         inputs = {
             "request": order.model_dump(mode="json", exclude_unset=True),

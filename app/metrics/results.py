@@ -23,6 +23,14 @@ class ShiftMetrics:
     mxn_per_km: float | None
     uncompleted_orders: int
     post_accept_infeasible: int
+    orders_cancelled: int = 0
+    skip_penalties_mxn: float = 0
+    cancellation_penalties_mxn: float = 0
+    reposition_count: int = 0
+    reposition_distance_km: float = 0
+    reposition_cost_mxn: float = 0
+    net_gain_after_reposition: float = 0
+    disruption_caused_lateness: int = 0
 
     def to_dict(self):
         return asdict(self)

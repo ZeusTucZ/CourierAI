@@ -18,6 +18,15 @@ class Economics(Model):
     adjusted_rate_mxn_hr: Finite
     reservation_wage_mxn_hr: NonNegative
     deadhead_km: NonNegative
+    zone_value_mxn_hr: Finite | None = None
+    opportunity_cost_mxn: NonNegative | None = None
+    skip_penalty_mxn: NonNegative | None = None
+    stacking_time_min: NonNegative | None = None
+
+    @model_serializer(mode="wrap")
+    def serialize_economics(self, handler):
+        # Old snapshots retain the original MVP 1/2 economics representation.
+        return {key: value for key, value in handler(self).items() if value is not None}
 
 
 class DecideResponse(Model):

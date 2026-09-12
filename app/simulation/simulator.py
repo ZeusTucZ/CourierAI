@@ -235,6 +235,12 @@ class Simulator:
                 if phase.kind != "waiting":
                     phase.remaining_us = round(phase.remaining_us * factor)
 
+    def _schedule_extensions(self):
+        """Optional between-ping work; MVP 2 schedules nothing."""
+
+    def _internal_event(self, kind, payload):
+        raise ValueError(f"Unknown internal event: {kind}")
+
     def run(self, stream: list[Event]) -> ShiftResult:
         if self._used:
             raise ValueError("Create a new simulator and agent for each independent run")
@@ -245,6 +251,7 @@ class Simulator:
         priorities = {"shift_start": -1, "shock": 2, "order_offered": 3, "shift_end": 9}
         for event in source:
             self._push(event_time(event), priorities[event["event"]], event["event"], event)
+        self._schedule_extensions()
         while self._queue:
             when, _, _, kind, payload = heapq.heappop(self._queue)
             if kind == "phase" and payload != self._work_version:
@@ -289,6 +296,8 @@ class Simulator:
                            earnings_mxn=self.state.net_earnings,
                            uncompleted_orders=len(self.state.in_flight_orders))
                 break
+            else:
+                self._internal_event(kind, payload)
         return ShiftResult(self.agent.name, self.config.seed, digest, deepcopy(self.state),
                            collect_metrics(self.log.events), self.log)
 

@@ -10,6 +10,7 @@ def economic_reason(accepted: bool, economics: Economics) -> str:
     if rate != wage and rate_text == wage_text:
         # Preserve visible differences at thresholds without cluttering ordinary reasons.
         rate_text, wage_text = repr(rate), repr(wage)
+    detail = "including zone value, opportunity cost and skip penalty." if economics.opportunity_cost_mxn or economics.skip_penalty_mxn else "including dropoff zone value."
     return (f"{action}: adjusted rate MXN {rate_text}/hr "
             f"{comparison} reservation_wage MXN {wage_text}/hr, "
-            "including dropoff zone value.")
+            f"{detail}")

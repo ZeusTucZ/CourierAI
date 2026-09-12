@@ -8,10 +8,14 @@ from app.simulation.events import Event
 def generate_shift(config: ShiftConfig) -> list[Event]:
     rng = Random(config.seed)
     settings = config.simulation
+    profile = config.profile
     start = settings.simulation_start_time
 
     def draw(bounds: Range) -> float:
         return round(rng.uniform(bounds.low, bounds.high), 6)
+
+    def value(bounds, name):
+        return getattr(profile, name).sample(rng) if profile else draw(bounds)
 
     events: list[Event] = [{
         "event": "shift_start", "sim_time": start.isoformat(), "seed": config.seed,
@@ -23,20 +27,26 @@ def generate_shift(config: ShiftConfig) -> list[Event]:
     at = start
     number = 1
     while at < config.shift_end:
+        if profile and profile.time_of_day_demand_profile[at.hour] == 0:
+            at = at.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+            continue
+        transition = rng.choices(profile.zone_transition_distribution,
+            weights=[t.count for t in profile.zone_transition_distribution])[0] if profile and profile.zone_transition_distribution else None
         events.append({
             "event": "order_offered", "order_id": f"ORD-{number:05d}",
             "sim_time": at.isoformat(), "decision_deadline": (at + timedelta(seconds=5)).isoformat(),
             "platform": rng.choice(("rappi", "didi", "uber")),
-            "zone_pickup": rng.randint(1, settings.zone_count),
-            "zone_dropoff": rng.randint(1, settings.zone_count),
-            "distance_pickup_km": draw(settings.distance_pickup_km),
-            "distance_delivery_km": draw(settings.distance_delivery_km),
-            "base_pay_mxn": draw(settings.base_pay_mxn), "est_tip_mxn": draw(settings.tip_mxn),
+            "zone_pickup": transition.pickup if transition else rng.randint(1, settings.zone_count),
+            "zone_dropoff": transition.dropoff if transition else rng.randint(1, settings.zone_count),
+            "distance_pickup_km": value(settings.distance_pickup_km, "pickup_distance_distribution"),
+            "distance_delivery_km": value(settings.distance_delivery_km, "order_distance_distribution"),
+            "base_pay_mxn": value(settings.base_pay_mxn, "base_pay_distribution"), "est_tip_mxn": value(settings.tip_mxn, "tip_distribution"),
             "surge_multiplier": settings.initial_surge_multiplier,
-            "restaurant_prep_min": draw(settings.prep_min), "weight_kg": draw(settings.weight_kg),
-            "volume_liters": draw(settings.volume_liters), "vehicle": config.vehicle,
+            "restaurant_prep_min": value(settings.prep_min, "prep_time_distribution"), "weight_kg": value(settings.weight_kg, "weight_distribution"),
+            "volume_liters": value(settings.volume_liters, "volume_distribution"), "vehicle": config.vehicle,
         })
-        at += timedelta(minutes=draw(settings.order_interval_min))
+        interval = max(.000001, rng.expovariate(profile.orders_per_hour * profile.time_of_day_demand_profile[at.hour] / 60)) if profile else draw(settings.order_interval_min)
+        at += timedelta(minutes=interval)
         number += 1
     schedule = settings.shock_schedule
     if schedule is None:

@@ -86,6 +86,13 @@ class CourierState:
     safety_violations: int = 0
     execution_hold: str | None = None
     post_accept_infeasible: int = 0
+    skip_penalties: float = 0
+    cancellation_penalties: float = 0
+    orders_cancelled: int = 0
+    reposition_count: int = 0
+    reposition_distance_km: float = 0
+    reposition_cost_mxn: float = 0
+    disruption_caused_lateness: int = 0
 
     @classmethod
     def for_shift(cls, config: ShiftConfig):
@@ -106,7 +113,7 @@ class CourierState:
 
     @property
     def net_earnings(self):
-        return self.gross_earnings - self.operating_costs
+        return self.gross_earnings - self.operating_costs - self.skip_penalties - self.cancellation_penalties
 
     @property
     def idle_time_min(self):
