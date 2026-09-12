@@ -1,0 +1,17 @@
+{
+  "version": "first-nearby-v1",
+  "max_distance_km": 14.990869288322063,
+  "percentile": 75.0,
+  "sample_size": 31654,
+  "observed_total_sample_size": 0,
+  "source": "Frozen calibrated profile: empirical delivery training + uniform synthetic pickup",
+  "profile_version": "calibrated-b902d8308110",
+  "classification": "derived_profile_proxy_not_historical_total",
+  "transformation": "P75 of independent empirical delivery + Uniform(pickup.low,pickup.high); analytic mixture CDF, 60 bisections, no RNG/seeds",
+  "limitations": [
+    "Historical pickup distance absent; sample_size counts delivery observations only, not measured total trips.",
+    "Synthetic pickup and independence assumption; delivery is haversine, not road km.",
+    "Simulator position-to-zone surcharge is excluded from this profile-derived threshold; actual offered total includes it."
+  ],
+  "source_sha256": "e76f5f5b53f3de3fb66e15321708de664ef2ec0c198e51712e901c5ed0438793"
+}
