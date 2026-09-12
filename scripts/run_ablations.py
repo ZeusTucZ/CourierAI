@@ -7,11 +7,17 @@ from scripts.mvp3_common import arguments
 
 def main():
     args, profile, model, policy, tuning, _ = arguments("MVP 3 ablations on tuning seeds only")
-    output = args.output_dir or Path("evaluation/ablation_results")
+    from app.evaluation.freeze import load_frozen
+    from app.evaluation.runner import validate_training
+    profile, model, policy = load_frozen(Path("artifacts/final_strategy_config.json"))
+    validate_training(profile, model, tuning, _)
+    from app.agents.nearby import FirstNearbyBaselineConfig
+    baseline_config = FirstNearbyBaselineConfig.load()
+    output = args.output_dir or Path("evaluation/ablation_nearby_results")
     results = {}
     for name in ABLATIONS:
         results[name] = evaluate(tuning, profile, model, variant(policy, name), output=output / name,
-                                 vehicle=args.vehicle, hours=args.shift_hours)
+                                 vehicle=args.vehicle, hours=args.shift_hours, baseline_config=baseline_config)
     full = results["SmartFull"]["mean_smart_net"]
     rows = [{"variant": name, "mean_net": value["mean_smart_net"], "delta_vs_full": value["mean_smart_net"] - full,
              "delta_vs_baseline": value["mean_smart_net"] - value["mean_baseline_net"]} for name, value in results.items()]

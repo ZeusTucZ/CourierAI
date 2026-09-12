@@ -52,6 +52,8 @@ class SimulationProfile(Model):
     volume_distribution: Distribution = Distribution(low=1, high=12)
     zone_transition_distribution: tuple[Transition, ...] = ()
     time_of_day_demand_profile: tuple[NonNegative, ...] = (1,) * 24
+    vehicle_distribution: tuple[tuple[str, int], ...] = ()
+    multiple_delivery_frequency: NonNegative | None = None
     provenance: tuple[Provenance, ...] = ()
     training_seeds: tuple[int, ...] = ()
     source_sha256: str | None = None

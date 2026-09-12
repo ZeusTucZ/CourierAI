@@ -19,7 +19,9 @@ def arguments(description):
     args = parser.parse_args()
     profile = SimulationProfile.load(args.profile)
     model = HistoricalDemandModel.model_validate_json(args.model.read_text())
-    policy = StrategyPolicy.model_validate_json(args.policy.read_text()) if args.policy else StrategyPolicy()
+    default_policy = Path("artifacts/calibrated_policy.json")
+    policy_path = args.policy or (default_policy if default_policy.exists() else None)
+    policy = StrategyPolicy.model_validate_json(policy_path.read_text()) if policy_path else StrategyPolicy()
     tuning, heldout = seed_sets()
     validate_training(profile, model, tuning, heldout)
     return args, profile, model, policy, tuning, heldout
@@ -27,6 +29,10 @@ def arguments(description):
 
 def run(mode):
     args, profile, model, policy, tuning, heldout = arguments(f"Frozen MVP 3 {mode} evaluation")
+    if mode == "heldout":
+        from app.evaluation.freeze import load_frozen
+        profile, model, policy = load_frozen(Path("artifacts/final_strategy_config.json"))
+        validate_training(profile, model, tuning, heldout)
     seeds = heldout if mode == "heldout" else tuning
     if mode == "heldout" and len(seeds) < 10:
         raise ValueError("At least 10 heldout shifts required")

@@ -16,7 +16,7 @@ def calculate_economics(order: DecideRequest, snapshot: StrategySnapshot,
     raw = net / plan.total_time_min * 60
     zone_value = snapshot.zone_values.get(order.zone_dropoff, 0)
     prediction = snapshot.zone_predictions.get(order.zone_pickup)
-    opportunity = opportunity_cost(prediction.expected_net_mxn_per_hour if prediction else 0,
+    opportunity = opportunity_cost((prediction.expected_net_mxn_per_hour or 0) if prediction else 0,
                                    plan.total_time_min, snapshot.opportunity_fraction) if snapshot.economics_v2 else 0
     skip = snapshot.skip_penalty_mxn if snapshot.economics_v2 else 0
     return Economics(

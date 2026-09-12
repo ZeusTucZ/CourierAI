@@ -46,7 +46,8 @@ def main():
         parser.error("Iterations must be positive")
     profile = SimulationProfile.load(Path("artifacts/calibrated_profile.json"))
     model = HistoricalDemandModel.model_validate_json(Path("artifacts/historical_model.json").read_text())
-    policy = StrategyPolicy()
+    from app.evaluation.freeze import load_frozen
+    profile, model, policy = load_frozen(Path("artifacts/final_strategy_config.json"))
     store = StrategyStore(StrategySnapshot())
     updater = StrategyUpdater(model, policy, range(1, 13))
     when = datetime(2026, 3, 21, 18)

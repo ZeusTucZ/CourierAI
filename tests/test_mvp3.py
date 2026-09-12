@@ -121,7 +121,7 @@ def test_historical_fit_requires_exposure_and_excludes_missing_economics():
     rows = (NormalizedDeliveryRecord(timestamp=datetime(2026, 1, 1, 18), pickup_zone=7),)
     with pytest.raises(ValueError, match="exposure"):
         HistoricalDemandModel.fit(rows, hour_exposure={})
-    assert not HistoricalDemandModel.fit(rows, hour_exposure={18: 1}).buckets
+    assert HistoricalDemandModel.fit(rows, hour_exposure={18: 1}).buckets[0].gross_pay is None
 
 
 def test_snapshot_update_clipping_and_immutability():

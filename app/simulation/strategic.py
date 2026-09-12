@@ -274,7 +274,7 @@ class StrategicSimulator(Simulator):
             prediction = self.agent.snapshot.zone_predictions.get(self.state.current_zone)
             cost = sum(p.distance_km for p in job.phases) * self.agent.snapshot.vehicle_profiles[self.state.vehicle].operating_cost_mxn_per_km
             choice = policy.evaluate(triggering_shock=trigger, remaining_net=job.offer.base_pay_mxn * job.offer.surge_multiplier + job.offer.est_tip_mxn - cost,
-                remaining_min=minutes, lateness_min=late, expected_rate=prediction.expected_net_mxn_per_hour if prediction else 0,
+                remaining_min=minutes, lateness_min=late, expected_rate=(prediction.expected_net_mxn_per_hour or 0) if prediction else 0,
                 infeasible=self.state.execution_hold is not None)
             self._trace("cancellation_evaluated", order_id=job.offer.order_id, triggering_shock=trigger,
                 estimated_continue_value=choice.continue_value, estimated_cancel_value=choice.cancel_value, cancel=choice.cancel,

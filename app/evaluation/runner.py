@@ -5,6 +5,7 @@ from pathlib import Path
 from statistics import mean, median
 
 from app.agents.baseline import GreedyRateBaseline
+from app.agents.nearby import FirstNearbyOrderBaseline
 from app.agents.smart import SmartAgent
 from app.logging.event_log import encode_events
 from app.models.strategy import StrategySnapshot
@@ -36,16 +37,25 @@ def fingerprint(*models):
     return sha256(json.dumps([m.model_dump(mode="json") for m in models], sort_keys=True).encode()).hexdigest()
 
 
-def run_pair_v3(cfg, model, policy, output=None):
+def run_pair_v3(cfg, model, policy, output=None, *, baseline_config=None):
     source = generate_shift(cfg)
     snapshot = StrategySnapshot(reservation_wage_mxn_hr=policy.base_reservation_wage, zone_values={})
     results = []
-    for agent in (GreedyRateBaseline(snapshot), SmartAgent(snapshot)):
-        simulator = StrategicSimulator(cfg, agent, model, policy)
+    baseline = FirstNearbyOrderBaseline(baseline_config, snapshot) if baseline_config is not None else GreedyRateBaseline(snapshot)
+    for agent in (baseline, SmartAgent(snapshot)):
+        # Baseline-only policy disables strategic actions; Smart's policy is unchanged.
+        agent_policy = policy.model_copy(update={
+            "use_zone_value": False, "use_reposition": False,
+            "use_improved_batching": False, "use_historical_prediction": False,
+            "use_cancellation": False,
+        }) if isinstance(agent, FirstNearbyOrderBaseline) else policy
+        simulator = StrategicSimulator(cfg, agent, model, agent_policy)
         try:
             result = simulator.run(source)
         except Exception as exc:
             raise RuntimeError(f"FAILED seed={cfg.seed} agent={agent.name} state={simulator.state.summary()} last_events={simulator.log.events[-3:]}: {exc}") from exc
+        if isinstance(agent, FirstNearbyOrderBaseline):
+            result.log.events[0]["baseline_config"] = baseline_config.model_dump(mode="json")
         if output is not None:
             folder = Path(output) / f"seed-{cfg.seed}"
             folder.mkdir(parents=True, exist_ok=True)
@@ -62,15 +72,18 @@ def enforce_safety(results):
             raise ValueError(f"FAILED safety seed={result.seed} agent={result.agent_name} state={result.state.summary()}")
 
 
-def evaluate(seeds, profile, model, policy, *, output, vehicle="moto", hours=8):
+def evaluate(seeds, profile, model, policy, *, output, vehicle="moto", hours=8, baseline_config=None):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     frozen = fingerprint(profile, model, policy)
+    baseline_fingerprint = fingerprint(baseline_config) if baseline_config is not None else None
     rows, pairs = [], []
     for seed in seeds:
         cfg = ShiftConfig(seed=seed, shift_hours=hours, vehicle=vehicle, start_location_zone=7, profile=profile)
-        baseline, smart = run_pair_v3(cfg, model, policy, output)
+        baseline, smart = run_pair_v3(cfg, model, policy, output, baseline_config=baseline_config)
         enforce_safety((baseline, smart))
+        if baseline_config is not None and fingerprint(baseline_config) != baseline_fingerprint:
+            raise ValueError("Baseline configuration mutated")
         if fingerprint(profile, model, policy) != frozen:
             raise ValueError("FAILED: experiment configuration mutated")
         b, s = baseline.metrics, smart.metrics
@@ -78,7 +91,7 @@ def evaluate(seeds, profile, model, policy, *, output, vehicle="moto", hours=8):
         rows.append({"seed": seed, "baseline": b.to_dict(), "smart": s.to_dict(), "improvement_pct": improvement})
         pairs.append((baseline, smart))
     percentages = [row["improvement_pct"] for row in rows if row["improvement_pct"] is not None]
-    summary = {"status": "PASS", "shifts": len(rows), "frozen_config_sha256": frozen,
+    summary = {"baseline_name": pairs[0][0].agent_name, "baseline_config_sha256": baseline_fingerprint, "status": "PASS", "shifts": len(rows), "frozen_config_sha256": frozen,
         "mean_baseline_net": mean(row["baseline"]["net_earnings_mxn"] for row in rows),
         "mean_smart_net": mean(row["smart"]["net_earnings_mxn"] for row in rows),
         "mean_improvement_pct": mean(percentages) if percentages else None,
@@ -88,7 +101,8 @@ def evaluate(seeds, profile, model, policy, *, output, vehicle="moto", hours=8):
         "safety_violations": 0, "rows": rows}
     (output / "results.json").write_text(json.dumps(summary, indent=2, allow_nan=False) + "\n")
     (output / "frozen_configuration.json").write_text(json.dumps({"profile": profile.model_dump(mode="json"),
-        "model": model.model_dump(mode="json"), "policy": policy.model_dump(mode="json"), "seeds": seeds}, indent=2) + "\n")
+        "model": model.model_dump(mode="json"), "policy": policy.model_dump(mode="json"), "seeds": seeds,
+        "baseline_config": baseline_config.model_dump(mode="json") if baseline_config is not None else None}, indent=2) + "\n")
     write_results_csv(pairs, output / "results_mvp3.csv")
     return summary
 
@@ -99,7 +113,7 @@ def write_results_csv(pairs, path):
     with Path(path).open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=header.split(","))
         writer.writeheader()
-        for index, name in ((0, "GreedyRate"), (1, "OurAgent")):
+        for index, name in ((0, pairs[0][0].agent_name if pairs[0][0].agent_name == "FirstNearbyOrderBaseline" else "GreedyRate"), (1, "OurAgent")):
             results = [pair[index] for pair in pairs]
             metrics = [r.metrics for r in results]
             # Actual completed pickup-phase distance is logged separately only

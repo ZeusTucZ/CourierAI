@@ -6,17 +6,28 @@ from app.models.common import Model, NonNegative, Positive
 class ZonePrediction(Model):
     zone: int
     time_bucket: int = Field(ge=0, le=23)
-    expected_orders_per_hour: NonNegative = 0
-    expected_gross_pay: NonNegative = 0
-    expected_net_pay: float = Field(default=0, allow_inf_nan=False)
+    expected_orders_per_hour: NonNegative | None = 0
+    expected_trip_distance: NonNegative | None = None
+    expected_delivery_time: NonNegative | None = None
+    economics_available: bool = True
+    expected_gross_pay: NonNegative | None = 0
+    expected_net_pay: float | None = Field(default=0, allow_inf_nan=False)
     expected_wait_time_min: NonNegative | None = None
-    expected_net_mxn_per_hour: NonNegative = 0
+    expected_net_mxn_per_hour: NonNegative | None = 0
     sample_count: int = Field(default=0, ge=0)
     confidence: float = Field(default=0, ge=0, le=1)
     fallback: bool = False
 
 
+class SLABucket(Model):
+    distance_upper_km: NonNegative
+    expected_min: NonNegative
+    p90_min: NonNegative
+    sample_count: int = Field(ge=30)
+
+
 class StrategyPolicy(Model):
+    sla_distance_buckets: tuple[SLABucket, ...] = ()
     zone_value_clip: NonNegative = 50
     base_reservation_wage: NonNegative = 165
     min_reservation_wage: NonNegative = 80
