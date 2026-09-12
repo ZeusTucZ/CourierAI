@@ -1,0 +1,85 @@
+[
+  {
+    "order_id": "DEMO-ACCEPT",
+    "decision": "ACCEPT",
+    "reason": "Accepted: adjusted rate MXN 653.40/hr meets or exceeds reservation_wage MXN 165.00/hr, including dropoff zone value.",
+    "binding_constraint": null,
+    "latency_ms": 3.6337,
+    "tier": "tier1",
+    "degraded": false,
+    "economics": {
+      "gross_pay_mxn": 110.0,
+      "operating_cost_mxn": 3.5999999999999996,
+      "net_pay_mxn": 106.4,
+      "total_time_min": 10.0,
+      "raw_rate_mxn_hr": 638.4000000000001,
+      "adjusted_rate_mxn_hr": 653.4000000000001,
+      "reservation_wage_mxn_hr": 165.0,
+      "deadhead_km": 1.0
+    }
+  },
+  {
+    "order_id": "DEMO-PAY",
+    "decision": "SKIP",
+    "reason": "Skipped: adjusted rate MXN -6.60/hr is below reservation_wage MXN 165.00/hr, including dropoff zone value.",
+    "binding_constraint": "reservation_wage",
+    "latency_ms": 0.8412,
+    "tier": "tier1",
+    "degraded": false,
+    "economics": {
+      "gross_pay_mxn": 0.0,
+      "operating_cost_mxn": 3.5999999999999996,
+      "net_pay_mxn": -3.5999999999999996,
+      "total_time_min": 10.0,
+      "raw_rate_mxn_hr": -21.599999999999998,
+      "adjusted_rate_mxn_hr": -6.599999999999998,
+      "reservation_wage_mxn_hr": 165.0,
+      "deadhead_km": 1.0
+    }
+  },
+  {
+    "order_id": "DEMO-NIGHT",
+    "decision": "SKIP",
+    "reason": "Skipped: flagged_zone_night prohibits dropoff in zone 11 at or after 22:00.",
+    "binding_constraint": "flagged_zone_night",
+    "latency_ms": 0.792,
+    "tier": "tier1",
+    "degraded": false
+  },
+  {
+    "order_id": "DEMO-BREAK",
+    "decision": "SKIP",
+    "reason": "Skipped: mandatory_break requires 20 minutes of rest; projected continuous riding is 250.00 minutes, limit 240.",
+    "binding_constraint": "mandatory_break",
+    "latency_ms": 1.1706,
+    "tier": "tier1",
+    "degraded": false
+  },
+  {
+    "order_id": "DEMO-HEAT",
+    "decision": "SKIP",
+    "reason": "Skipped: heat_rule projects 95.00 continuous riding minutes during 12:00-16:00, exceeding the 90-minute limit.",
+    "binding_constraint": "heat_rule",
+    "latency_ms": 1.1268,
+    "tier": "tier1",
+    "degraded": false
+  },
+  {
+    "order_id": "DEMO-SHIFT",
+    "decision": "SKIP",
+    "reason": "Skipped: shift_end_infeasible; estimated completion is 5.00 minutes after shift end, including existing work.",
+    "binding_constraint": "shift_end_infeasible",
+    "latency_ms": 0.9388,
+    "tier": "tier1",
+    "degraded": false
+  },
+  {
+    "order_id": "DEMO-CAPACITY",
+    "decision": "SKIP",
+    "reason": "Skipped: vehicle_capacity; combined weight 16.00 kg exceeds the moto limit of 15 kg.",
+    "binding_constraint": "vehicle_capacity",
+    "latency_ms": 1.1343,
+    "tier": "tier1",
+    "degraded": false
+  }
+]

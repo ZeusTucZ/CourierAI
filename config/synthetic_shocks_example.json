@@ -1,0 +1,8 @@
+{
+  "shock_schedule": [
+    {"at_min": 30, "shock_type": "surge", "zone": 7, "multiplier": 1.5, "duration_min": 20},
+    {"at_min": 60, "shock_type": "rain", "duration_min": 30},
+    {"at_min": 90, "shock_type": "closure", "zone": 11, "duration_min": 20},
+    {"at_min": 3, "shock_type": "delay", "order_id": "ORD-00001", "slip_min": 5}
+  ]
+}
