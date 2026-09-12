@@ -43,3 +43,21 @@ def run(cfg, *events, agent=None):
 
 def selected(result, event_type):
     return [event for event in result.log.events if event["event"] == event_type]
+
+
+# Named builders shared by the controlled audit scenarios and console demos.
+def make_shift(**changes):
+    return config(**changes)
+
+
+def make_order(cfg, **changes):
+    return offer(cfg, **changes)
+
+
+def make_state(cfg):
+    from app.simulation.state import CourierState
+    return CourierState.for_shift(cfg)
+
+
+def make_shock(cfg, at, kind, **fields):
+    return shock(cfg, at, kind, **fields)
