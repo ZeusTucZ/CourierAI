@@ -7,3 +7,7 @@ evaluation/*_results/
 data/raw/
 data/processed/
 data/osm/
+frontend/node_modules/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/

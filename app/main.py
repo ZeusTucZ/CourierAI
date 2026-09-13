@@ -13,18 +13,22 @@ from app.models.strategy import StrategySnapshot
 from app.services.strategy_store import StrategyStore
 
 
-def create_app(snapshot: StrategySnapshot | None = None, *, routing_service=None, geospatial_runs=None) -> FastAPI:
+def create_app(snapshot: StrategySnapshot | None = None, *, routing_service=None, geospatial_runs=None, demo_service=None) -> FastAPI:
     from app.geospatial.api import router as geographic_router
     from app.geospatial.service import RoutingService
     from app.geospatial.zones import ROOT
+    from app.demo.api import router as demo_router
+    from app.demo.service import DemoService
 
     @asynccontextmanager
     async def lifespan(application):
         yield
+        await application.state.demo.close()
         application.state.routing.close()
 
     application = FastAPI(title="Courier Fast Decision Engine", version="0.1.0", lifespan=lifespan)
     application.state.routing = routing_service or RoutingService(ROOT / "data/osm")
+    application.state.demo = demo_service or DemoService()
     application.state.geospatial_runs = Path(geospatial_runs or ROOT / "artifacts/geospatial/runs")
     application.state.decisions = DecisionService(
         StrategyStore(snapshot or StrategySnapshot()), DecisionLog(),
@@ -45,6 +49,7 @@ def create_app(snapshot: StrategySnapshot | None = None, *, routing_service=None
 
     application.include_router(router)
     application.include_router(geographic_router)
+    application.include_router(demo_router)
     return application
 
 
