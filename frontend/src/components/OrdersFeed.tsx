@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import type { Order, Shock, Zone } from '../types'
 import { formatReason, money, time } from '../format'
 import { DecisionBadge, DecisionExplanation, useNaturalExplanation } from './DecisionExplanation'
+import { RouteRecalculationLog } from './RouteRecalculationLog'
 
 export function OrderDecisionCard({ order, zones, evaluating = false, sessionId }: { order: Order; zones: Map<number, Zone>; evaluating?: boolean; sessionId?: string }) {
   const natural = useNaturalExplanation(sessionId, order.order_id)
@@ -35,7 +36,7 @@ export function ShockCard({ shock }: { shock: Shock }) {
   </article>
 }
 
-export function OrdersFeed({ orders, shocks, zones, evaluating, sessionId, revision = 0 }: { orders: Order[]; shocks: Shock[]; zones: Map<number, Zone>; evaluating: string | null; sessionId?: string; revision?: number }) {
+export function OrdersFeed({ orders, shocks, zones, evaluating, sessionId, revision = 0, recalculating = false }: { orders: Order[]; shocks: Shock[]; zones: Map<number, Zone>; evaluating: string | null; sessionId?: string; revision?: number; recalculating?: boolean }) {
   const feed = useRef<HTMLDivElement>(null)
   const pinned = useRef(true)
   const [unseen, setUnseen] = useState(false)
@@ -52,6 +53,7 @@ export function OrdersFeed({ orders, shocks, zones, evaluating, sessionId, revis
     previous.current = { id: newest, height: element.scrollHeight }
   }, [newest, orders, shocks])
   return <aside className="orders-panel"><div className="feed-heading"><div><h2>Orders <span>{orders.length}</span></h2><p>One stream. Two decisions.</p></div><span className="live-dot"/></div>
+    <RouteRecalculationLog shocks={shocks} recalculating={recalculating}/>
     {unseen && <button className="latest-button" onClick={() => { feed.current?.scrollTo({ top: 0, behavior: 'smooth' }); pinned.current = true; setUnseen(false) }}>↑ New arrivals</button>}
     <div className="feed" ref={feed} onScroll={() => { pinned.current = (feed.current?.scrollTop ?? 0) < 24 }}>
       {entries.length === 0 && <div className="feed-empty"><span>↘</span><h3>Watch the decisions unfold</h3><p>Start a shift. Every incoming order will appear here with both agents’ decisions.</p></div>}

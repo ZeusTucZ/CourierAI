@@ -7,6 +7,7 @@ import { ShiftCompleteModal } from '../components/ShiftCompleteModal'
 import { DecisionBadge } from '../components/DecisionExplanation'
 import { order, agent, state, shock, decision } from './fixtures'
 import { difference, formatReason } from '../format'
+import { RouteRecalculationLog } from '../components/RouteRecalculationLog'
 
 vi.mock('../components/CourierMap', () => ({ CourierMap: ({ agent }: { agent: string }) => <div role="img" aria-label={`${agent} map`}/> }))
 const zones = new Map([[7, { zone_id: 7, name: 'Tecnológico', latitude: 25.65, longitude: -100.289 }], [1, { zone_id: 1, name: 'Centro', latitude: 25.67, longitude: -100.31 }]])
@@ -84,6 +85,16 @@ describe('Demo presentation uses recorded values', () => {
     render(<ShockCard shock={shock}/>)
     expect(screen.getByText('ϟ Road closure')).toBeInTheDocument()
     expect(screen.getByText(/0.17 km \/ 24 sec/)).toBeInTheDocument()
+  })
+  it('shows route recalculation progress and a history based on recorded detours', () => {
+    const view = render(<RouteRecalculationLog shocks={[]} recalculating/>)
+    expect(screen.getByRole('status')).toHaveTextContent('Recalculating routes…')
+    fireEvent.click(screen.getByText('Route recalculation history'))
+    expect(screen.getByText('No route events yet.')).toBeInTheDocument()
+    view.rerender(<RouteRecalculationLog shocks={[shock]} recalculating={false}/>)
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.getByText(/Route updated for ORD-001 · \+0.17 km · \+0.40 min/)).toBeInTheDocument()
+    expect(screen.getByText('No active route changed')).toBeInTheDocument()
   })
   it('shows a truthful winner and final comparison', () => {
     render(<ShiftCompleteModal state={{ ...state, status: 'completed' }} close={vi.fn()} reset={vi.fn()}/>)

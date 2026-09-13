@@ -17,6 +17,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [evaluating, setEvaluating] = useState<string | null>(null)
   const [banner, setBanner] = useState<Shock | null>(null)
+  const [routeUpdate, setRouteUpdate] = useState(false)
   const [dismissed, setDismissed] = useState(false)
   const lastShock = useRef('')
   const latest = state?.orders.at(-1)
@@ -37,6 +38,9 @@ export default function App() {
     return () => clearTimeout(timer)
   }, [latest?.order_id])
   const newestShock = state?.shocks.at(-1)
+  useEffect(() => {
+    if (routeUpdate && !pending && state?.status !== 'updating') setRouteUpdate(false)
+  }, [routeUpdate, pending, state?.status])
   useEffect(() => {
     if (!newestShock) { lastShock.current = ''; setBanner(null); return }
     if (lastShock.current === newestShock.id) return
@@ -60,14 +64,18 @@ export default function App() {
     if (action === 'reset') { setDismissed(false); lastShock.current = ''; setBanner(null) }
     void perform(() => api.control(state.id, action, speed))
   }
-  function inject(type: Shock['shock_type']) { if (state) void perform(() => api.inject(state.id, type)) }
+  function inject(type: Shock['shock_type']) {
+    if (!state) return
+    setRouteUpdate(type === 'rain' || type === 'closure' || type === 'delay')
+    void perform(() => api.inject(state.id, type))
+  }
   const progress = state?.start_time && state.end_time ? (state.elapsed_seconds ?? 0) / ((Date.parse(state.end_time) - Date.parse(state.start_time)) / 1000) * 100 : 0
   return <div className="app-shell"><Header state={state} seed={seed} setSeed={setSeed} shiftHours={shiftHours} setShiftHours={setShiftHours} start={start} control={control} inject={inject} connected={connected} busy={!!busy}/>
     <div className="shift-progress"><div style={{ width: `${progress}%` }}/></div>
     {(error || state?.error) && <div className="error-banner" role="alert">{error || state?.error}<button onClick={() => setError(null)} aria-label="Dismiss error">×</button></div>}
-    <div className="story-bar"><span>{busy ? <><span className="pulse-dot"/>{state?.status === 'updating' ? 'Applying event in the simulator… playback paused' : 'Preparing the OSM-backed shift…'}</> : latest ? <><b className="new-order-tag">NEW ORDER</b><strong>{latest.order_id}</strong><span>{zones.get(latest.zone_pickup)?.name ?? `Zone ${latest.zone_pickup}`} → {zones.get(latest.zone_dropoff)?.name ?? `Zone ${latest.zone_dropoff}`}</span></> : <><span className="live-dot"/> Two couriers. One shared order stream.</>}</span><small>{state?.status === 'paused' ? 'Ⅱ Playback paused' : state?.status === 'completed' ? '✓ Shift complete' : 'Watch what each agent chooses — and why.'}</small></div>
+    <div className="story-bar"><span>{busy ? <><span className="pulse-dot"/>{routeUpdate ? 'Recalculating routes… playback paused' : state?.status === 'updating' ? 'Applying event in the simulator… playback paused' : 'Preparing the OSM-backed shift…'}</> : latest ? <><b className="new-order-tag">NEW ORDER</b><strong>{latest.order_id}</strong><span>{zones.get(latest.zone_pickup)?.name ?? `Zone ${latest.zone_pickup}`} → {zones.get(latest.zone_dropoff)?.name ?? `Zone ${latest.zone_dropoff}`}</span></> : <><span className="live-dot"/> Two couriers. One shared order stream.</>}</span><small>{state?.status === 'paused' ? 'Ⅱ Playback paused' : state?.status === 'completed' ? '✓ Shift complete' : 'Watch what each agent chooses — and why.'}</small></div>
     {banner && <div className="shock-banner" role="status">ϟ <strong>{({ rain: 'Rain detected', surge: 'Surge activated', closure: 'Road closure detected', delay: 'Order delay' })[banner.shock_type]}</strong><span>{banner.detours.smart.length || banner.detours.baseline.length ? 'Active routes updated · see the event in Orders' : 'Simulator event received · see Orders for its effects'}</span></div>}
-    <main className="workspace"><AgentPanel agent="baseline" state={state?.agents.baseline} order={latest} orders={state?.orders ?? []} zones={zones} simTime={state?.sim_time} evaluating={evaluating !== null} revision={state?.revision ?? 0} sessionId={state?.id}/><AgentPanel agent="smart" state={state?.agents.smart} order={latest} orders={state?.orders ?? []} zones={zones} simTime={state?.sim_time} evaluating={evaluating !== null} revision={state?.revision ?? 0} sessionId={state?.id}/><OrdersFeed orders={state?.orders ?? []} shocks={state?.shocks ?? []} zones={zones} evaluating={evaluating} sessionId={state?.id} revision={state?.revision ?? 0}/></main>
+    <main className="workspace"><AgentPanel agent="baseline" state={state?.agents.baseline} order={latest} orders={state?.orders ?? []} zones={zones} simTime={state?.sim_time} evaluating={evaluating !== null} revision={state?.revision ?? 0} sessionId={state?.id}/><AgentPanel agent="smart" state={state?.agents.smart} order={latest} orders={state?.orders ?? []} zones={zones} simTime={state?.sim_time} evaluating={evaluating !== null} revision={state?.revision ?? 0} sessionId={state?.id}/><OrdersFeed orders={state?.orders ?? []} shocks={state?.shocks ?? []} zones={zones} evaluating={evaluating} sessionId={state?.id} revision={state?.revision ?? 0} recalculating={routeUpdate && busy}/></main>
     <footer className="page-footer"><span>INFOSYS HACKATHON <span> / </span> Courier decision demo</span><span>{state?.provenance ? state.provenance.startsWith('Frozen') ? 'Calibrated configuration · simulated results' : 'Illustrative simulation · not a held-out evaluation' : 'Real road geometry · simulated orders and earnings'}</span><span>MXN · 1x = 1 simulated sec / sec</span></footer>
     {state?.status === 'completed' && !dismissed && <ShiftCompleteModal state={state} close={() => setDismissed(true)} reset={() => control('reset')}/>}
   </div>
