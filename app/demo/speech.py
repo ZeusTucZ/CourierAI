@@ -1,5 +1,6 @@
 """Optional ElevenLabs narration for recorded route events."""
 import os
+import logging
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
@@ -7,6 +8,7 @@ from fastapi.responses import Response
 
 
 router = APIRouter(prefix='/demo/speech')
+logger = logging.getLogger(__name__)
 VOICE_ID = 'JBFqnCBsd6RMkjVDRZzb'  # George, ElevenLabs example voice.
 EVENT_NAMES = {'rain': 'Rain', 'closure': 'Road closure', 'delay': 'Order delay'}
 
@@ -77,9 +79,13 @@ async def speak_accepted_order(identifier: str, order_id: str, request: Request)
                 f'https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream',
                 params={'output_format': 'mp3_44100_128'},
                 headers={'xi-api-key': os.environ['ELEVENLABS_API_KEY']},
-                json={'text': 'Tienes un pedido nuevo.', 'model_id': model_id},
+                json={'text': 'You have a new order.', 'model_id': model_id},
             )
         result.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        logger.warning('ElevenLabs order announcement rejected with HTTP %s', exc.response.status_code)
+        raise HTTPException(502, 'ElevenLabs speech request failed') from exc
     except httpx.HTTPError as exc:
+        logger.warning('ElevenLabs order announcement could not be reached: %s', type(exc).__name__)
         raise HTTPException(502, 'ElevenLabs speech request failed') from exc
     return Response(result.content, media_type='audio/mpeg', headers={'Cache-Control': 'no-store'})
