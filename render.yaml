@@ -6,7 +6,7 @@ services:
     # `data/osm` is intentionally excluded from Git because the generated
     # graph exceeds GitHub's regular file-size limit. Create it at build time,
     # never as part of a request during the demo.
-    buildCommand: pip install -r requirements.txt && python -m scripts.build_osm_graph
+    buildCommand: pip install -r requirements.txt && python -m scripts.build_osm_graph && python -m scripts.compact_osm_graph
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /healthz
     envVars:
