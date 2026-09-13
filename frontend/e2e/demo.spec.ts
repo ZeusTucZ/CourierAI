@@ -15,7 +15,7 @@ test('real backend: both maps, shared orders, explanation, pause and reset', asy
   await page.locator('.order-card .why summary').first().click()
   await expect(page.locator('.explanation').first()).toBeVisible()
   // Let actual playback reach Smart's first accepted order. Baseline may skip it.
-  await expect(page.locator('.map-current-order').last()).not.toContainText('Sin orden activa', { timeout: 45000 })
+  await expect(page.locator('.map-current-order').last()).not.toContainText('No active order', { timeout: 45000 })
   await page.getByRole('button', { name: 'Ⅱ Pause', exact: true }).click()
   await expect(page.getByText('Ⅱ Playback paused')).toBeVisible()
   const clock = await page.locator('.clock strong').textContent()

@@ -71,6 +71,42 @@ async def decision(identifier: str, order_id: str, request: Request):
     return order["decisions"]
 
 
+@router.get("/simulations/{identifier}/decisions/{order_id}/explanation")
+async def explain_decision(identifier: str, order_id: str, request: Request):
+    current_session = session(request, identifier)
+    visible = current_session.state()
+    order = next((item for item in visible["orders"] if item["order_id"] == order_id), None)
+    if order is None or order["decisions"].get("smart") is None:
+        raise HTTPException(404, "Decision has not arrived in this playback")
+    key = (current_session.version, order_id)
+    if key in current_session.explanations:
+        return current_session.explanations[key]
+
+    async def generate():
+        from app.llm.explanation_service import GeminiExplanationService, fallback_explanation
+        recorded = order["decisions"]["smart"]
+        facts = {"decision": recorded["decision"], "structured_reason": recorded["reason"],
+                 "binding_constraint": recorded.get("binding_constraint"),
+                 "economics": recorded.get("economics")}
+        advisor = request.app.state.decisions.advisor
+        explanation = None
+        if advisor and advisor.config.enabled and advisor.config.api_key:
+            explanation = await GeminiExplanationService(advisor.client).explain_facts(facts)
+        result = {"structured_reason": recorded["reason"],
+                  "llm_explanation": explanation,
+                  "explanation": explanation or fallback_explanation(recorded),
+                  "source": "gemini" if explanation else "fallback"}
+        current_session.explanations[key] = result
+        return result
+
+    if key not in current_session.explanation_tasks:
+        current_session.explanation_tasks[key] = asyncio.create_task(generate())
+    try:
+        return await current_session.explanation_tasks[key]
+    finally:
+        current_session.explanation_tasks.pop(key, None)
+
+
 @router.websocket("/simulations/{identifier}/ws")
 async def updates(websocket: WebSocket, identifier: str):
     await websocket.accept()

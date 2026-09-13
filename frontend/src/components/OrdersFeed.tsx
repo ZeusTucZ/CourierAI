@@ -1,9 +1,10 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { Order, Shock, Zone } from '../types'
-import { money, time } from '../format'
-import { DecisionBadge, DecisionExplanation } from './DecisionExplanation'
+import { formatReason, money, time } from '../format'
+import { DecisionBadge, DecisionExplanation, useNaturalExplanation } from './DecisionExplanation'
 
-export function OrderDecisionCard({ order, zones, evaluating = false }: { order: Order; zones: Map<number, Zone>; evaluating?: boolean }) {
+export function OrderDecisionCard({ order, zones, evaluating = false, sessionId }: { order: Order; zones: Map<number, Zone>; evaluating?: boolean; sessionId?: string }) {
+  const natural = useNaturalExplanation(sessionId, order.order_id)
   const { baseline, smart } = order.decisions
   const different = !evaluating && baseline && smart && baseline.decision !== smart.decision
   const baseOffer = order.offers.baseline
@@ -13,13 +14,13 @@ export function OrderDecisionCard({ order, zones, evaluating = false }: { order:
   return <article className={`order-card ${different ? 'different' : ''}`}>
     <div className="order-card-top"><strong>{order.order_id}</strong><time>{time(order.sim_time).slice(0, 5)}</time></div>
     <p className="order-destination">{zones.get(order.zone_pickup)?.name ?? `Zone ${order.zone_pickup}`} <span>→</span> {zones.get(order.zone_dropoff)?.name ?? `Zone ${order.zone_dropoff}`}</p>
-    <div className="order-numbers"><span>{delivery !== undefined ? `${delivery.toFixed(1)} km delivery` : 'Route unavailable'}</span><strong>{pay !== undefined ? `${money(pay)} est. pay` : '—'}</strong></div>
-    {baseOffer && smartOffer && <p className="pickup-distances">Pickup · B {baseOffer.distance_pickup_km.toFixed(1)} km · S {smartOffer.distance_pickup_km.toFixed(1)} km</p>}
+    <div className="order-numbers"><span>{delivery !== undefined ? `${delivery.toFixed(2)} km delivery` : 'Route unavailable'}</span><strong>{pay !== undefined ? `${money(pay)} est. pay` : '—'}</strong></div>
+    {baseOffer && smartOffer && <p className="pickup-distances">Pickup · B {baseOffer.distance_pickup_km.toFixed(2)} km · S {smartOffer.distance_pickup_km.toFixed(2)} km</p>}
     <div className="decision-row"><span>Baseline</span><DecisionBadge decision={baseline} evaluating={evaluating}/></div>
     <div className="decision-row"><span className="smart-label">Smart</span><DecisionBadge decision={smart} evaluating={evaluating}/></div>
     {different && <div className="disagreement">↔ Different decision</div>}
-    <details className="why"><summary>Why? <span>Smart explanation</span></summary><DecisionExplanation decision={smart}/></details>
-    {baseline && <details className="baseline-why"><summary>Baseline reason</summary><p>{baseline.reason}</p>{baseline.binding_constraint && <code>{baseline.binding_constraint}</code>}</details>}
+    <details className="why" onToggle={event => { if (event.currentTarget.open && smart) void natural.load() }}><summary>Why? <span>Smart explanation</span></summary><DecisionExplanation decision={smart} natural={natural.result} loading={natural.loading} error={natural.error}/></details>
+    {baseline && <details className="baseline-why"><summary>Baseline reason</summary><p>{formatReason(baseline.reason)}</p>{baseline.binding_constraint && <code>{baseline.binding_constraint}</code>}</details>}
   </article>
 }
 
@@ -34,7 +35,7 @@ export function ShockCard({ shock }: { shock: Shock }) {
   </article>
 }
 
-export function OrdersFeed({ orders, shocks, zones, evaluating }: { orders: Order[]; shocks: Shock[]; zones: Map<number, Zone>; evaluating: string | null }) {
+export function OrdersFeed({ orders, shocks, zones, evaluating, sessionId, revision = 0 }: { orders: Order[]; shocks: Shock[]; zones: Map<number, Zone>; evaluating: string | null; sessionId?: string; revision?: number }) {
   const feed = useRef<HTMLDivElement>(null)
   const pinned = useRef(true)
   const [unseen, setUnseen] = useState(false)
@@ -54,7 +55,7 @@ export function OrdersFeed({ orders, shocks, zones, evaluating }: { orders: Orde
     {unseen && <button className="latest-button" onClick={() => { feed.current?.scrollTo({ top: 0, behavior: 'smooth' }); pinned.current = true; setUnseen(false) }}>↑ New arrivals</button>}
     <div className="feed" ref={feed} onScroll={() => { pinned.current = (feed.current?.scrollTop ?? 0) < 24 }}>
       {entries.length === 0 && <div className="feed-empty"><span>↘</span><h3>Watch the decisions unfold</h3><p>Start a shift. Every incoming order will appear here with both agents’ decisions.</p></div>}
-      {entries.map(entry => entry.order ? <OrderDecisionCard key={entry.id} order={entry.order} zones={zones} evaluating={evaluating === entry.id}/> : <ShockCard key={entry.id} shock={entry.shock!}/>)}
-    </div><div className="feed-footer">Explanations from recorded decisions · no LLM</div>
+      {entries.map(entry => entry.order ? <OrderDecisionCard key={`${entry.id}:${revision}`} order={entry.order} zones={zones} evaluating={evaluating === entry.id} sessionId={sessionId}/> : <ShockCard key={entry.id} shock={entry.shock!}/>)}
+    </div><div className="feed-footer">Natural explanations on demand · original reasons preserved</div>
   </aside>
 }

@@ -20,4 +20,11 @@ Evaluate:
 Return only the required structured JSON.
 
 The deterministic optimization engine will make the final decision.'''
-EXPLANATION_SYSTEM_PROMPT = '''Explain the already-final courier decision using only supplied facts. Do not predict future orders or shocks. Do not invent numbers. Do not suggest changing the decision. Return one concise sentence.'''
+EXPLANATION_SYSTEM_PROMPT = '''You explain decisions already made by a courier optimization system.
+Write entirely in clear, natural English in one or two short sentences.
+Use only the supplied facts. If a hard constraint applies, explain it as the main reason.
+Never invent numbers, historical data, future orders, or future events.
+All displayed decimal values are already rounded to two places. Copy them exactly if used.
+Do not infer a different decision from rounded values; the recorded decision is final.
+Do not change or question the decision. Avoid internal codes such as shift_end_infeasible.
+Return only the explanation, without JSON or a heading.'''

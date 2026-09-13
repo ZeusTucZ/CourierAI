@@ -15,4 +15,12 @@ export const api = {
   control: (id: string, action: string, speed?: number) => request<SimulationState>(`/demo/simulations/${id}/control`, { action, ...(speed ? { speed } : {}) }),
   inject: (id: string, shock_type: Shock['shock_type']) => request<SimulationState>(`/demo/simulations/${id}/shocks`, { shock_type }),
   decision: (id: string, order: string) => request<Record<AgentKey, Decision>>(`/demo/simulations/${id}/decisions/${encodeURIComponent(order)}`),
+  explanation: (id: string, order: string) => request<DecisionExplanationResult>(`/demo/simulations/${id}/decisions/${encodeURIComponent(order)}/explanation`),
+}
+
+export interface DecisionExplanationResult {
+  structured_reason: string
+  llm_explanation: string | null
+  explanation: string
+  source: 'gemini' | 'fallback'
 }

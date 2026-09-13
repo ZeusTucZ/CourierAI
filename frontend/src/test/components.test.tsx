@@ -6,7 +6,7 @@ import { Header } from '../components/Header'
 import { ShiftCompleteModal } from '../components/ShiftCompleteModal'
 import { DecisionBadge } from '../components/DecisionExplanation'
 import { order, agent, state, shock, decision } from './fixtures'
-import { difference } from '../format'
+import { difference, formatReason } from '../format'
 
 vi.mock('../components/CourierMap', () => ({ CourierMap: ({ agent }: { agent: string }) => <div role="img" aria-label={`${agent} map`}/> }))
 const zones = new Map([[7, { zone_id: 7, name: 'Tecnológico', latitude: 25.65, longitude: -100.289 }], [1, { zone_id: 1, name: 'Centro', latitude: 25.67, longitude: -100.31 }]])
@@ -47,7 +47,7 @@ describe('Demo presentation uses recorded values', () => {
   })
   it('shows the active order over each courier map', () => {
     render(<><AgentPanel agent="baseline" state={{ ...agent, current_order: 'ORD-ACTIVE-1' }} revision={0} evaluating={false}/><AgentPanel agent="smart" state={{ ...agent, current_order: 'ORD-ACTIVE-2' }} revision={0} evaluating={false}/></>)
-    expect(screen.getAllByText('Orden actual:')).toHaveLength(2)
+    expect(screen.getAllByText('Current order:')).toHaveLength(2)
     expect(screen.getByText('ORD-ACTIVE-1')).toBeInTheDocument()
     expect(screen.getByText('ORD-ACTIVE-2')).toBeInTheDocument()
   })
@@ -57,27 +57,27 @@ describe('Demo presentation uses recorded values', () => {
       { order_id: 'ORD-B', phase: 'to_dropoff', pickup: [-100.28, 25.65] as [-100.28, 25.65], dropoff: [-100.31, 25.67] as [-100.31, 25.67], is_current: false },
     ] }
     render(<AgentPanel agent="smart" state={batching} revision={0} evaluating={false}/>)
-    expect(screen.getByLabelText('2 órdenes activas')).toHaveTextContent('ORD-A')
-    expect(screen.getByLabelText('2 órdenes activas')).toHaveTextContent('ORD-B')
-    expect(screen.getByText('Camino al domicilio')).toBeInTheDocument()
+    expect(screen.getByLabelText('2 active orders')).toHaveTextContent('ORD-A')
+    expect(screen.getByLabelText('2 active orders')).toHaveTextContent('ORD-B')
+    expect(screen.getByText('Heading to customer')).toBeInTheDocument()
   })
   it('opens an independent order history for each model', () => {
     const acceptedOrder = { ...order, order_id: 'ORD-ACCEPTED', decisions: { ...order.decisions, smart: { ...decision, order_id: 'ORD-ACCEPTED', decision: 'ACCEPT' as const } } }
     render(<AgentPanel agent="smart" state={agent} order={order} orders={[order, acceptedOrder]} zones={zones} revision={0} evaluating={false}/>)
-    fireEvent.click(screen.getByRole('button', { name: /Ver historial/ }))
+    fireEvent.click(screen.getByRole('button', { name: /View history/ }))
     const dialog = screen.getByRole('dialog')
     const history = within(dialog)
     expect(dialog).toHaveAccessibleName('Courier AI')
-    expect(screen.getByLabelText('2 pedidos recibidos')).toBeInTheDocument()
-    expect(screen.getByLabelText('1 pedidos aceptados')).toBeInTheDocument()
-    expect(screen.getByLabelText('1 pedidos omitidos')).toBeInTheDocument()
-    fireEvent.click(history.getByRole('button', { name: /Aceptados/ }))
+    expect(screen.getByLabelText('2 orders received')).toBeInTheDocument()
+    expect(screen.getByLabelText('1 orders accepted')).toBeInTheDocument()
+    expect(screen.getByLabelText('1 orders skipped')).toBeInTheDocument()
+    fireEvent.click(history.getByRole('button', { name: /Accepted/ }))
     expect(history.getByText('ORD-ACCEPTED')).toBeInTheDocument()
     expect(history.queryByText('ORD-001')).not.toBeInTheDocument()
-    fireEvent.click(history.getByRole('button', { name: /Omitidos/ }))
+    fireEvent.click(history.getByRole('button', { name: /Skipped/ }))
     expect(history.getByText('ORD-001')).toBeInTheDocument()
     expect(history.queryByText('ORD-ACCEPTED')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Cerrar historial' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close history' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
   it('shows actual closure detour', () => {
@@ -111,5 +111,49 @@ describe('Demo presentation uses recorded values', () => {
     render(<Header state={null} seed={42} setSeed={vi.fn()} shiftHours={4} setShiftHours={setShiftHours} start={vi.fn()} control={vi.fn()} inject={vi.fn()} connected busy={false}/>)
     fireEvent.change(screen.getByLabelText('Shift duration'), { target: { value: '6' } })
     expect(setShiftHours).toHaveBeenCalledWith(6)
+  })
+})
+
+describe('Natural decision explanations', () => {
+  it('loads Gemini text on demand while preserving the recorded reason', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
+      structured_reason: decision.reason,
+      llm_explanation: 'This order takes too much time for the value it offers.',
+      explanation: 'This order takes too much time for the value it offers.',
+      source: 'gemini',
+    }) })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<OrderDecisionCard order={order} zones={zones} sessionId="test-session"/>)
+    expect(fetchMock).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByText('Smart explanation'))
+    expect(await screen.findByText(/too much time/)).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(screen.getByText('View original technical reason')).toBeInTheDocument()
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('Smart panel explanation', () => {
+  it('shows natural text after request and retains technical reason', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
+      structured_reason: decision.reason,
+      llm_explanation: 'This order was skipped because its value does not justify the required time.',
+      explanation: 'This order was skipped because its value does not justify the required time.',
+      source: 'gemini',
+    }) })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<AgentPanel agent="smart" state={agent} order={order} simTime={state.sim_time} evaluating={false} revision={0} sessionId="test-session"/>)
+    fireEvent.click(screen.getByRole('button', { name: /Explain simply/ }))
+    expect(await screen.findByText(/value does not justify/)).toBeInTheDocument()
+    expect(screen.getByText('View original technical reason')).toBeInTheDocument()
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('Display precision', () => {
+  it('rounds decimal values in displayed reasons without changing the source text', () => {
+    const source = 'Rate 47.95012875105086 below 80.0 over 75.43513326666667 minutes.'
+    expect(formatReason(source)).toBe('Rate 47.95 below 80.00 over 75.44 minutes.')
+    expect(source).toContain('47.95012875105086')
   })
 })

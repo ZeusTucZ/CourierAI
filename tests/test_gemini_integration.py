@@ -129,3 +129,33 @@ def test_prewarm_endpoint_and_explanation_grounding(payload):
     record = agent.decide_request(order)
     log = agent.service.log.get(order.order_id)
     assert asyncio.run(GeminiExplanationService(Hallucinating()).explain(log)) is None
+
+
+def test_explanation_rounds_prompt_only_and_rejects_extra_numbers():
+    import json
+    from app.llm.explanation_service import GeminiExplanationService, fallback_explanation
+    facts = {
+        'decision': 'SKIP', 'binding_constraint': 'reservation_wage',
+        'structured_reason': 'Adjusted rate 47.95012875105086 MXN/hr is below 80.0 MXN/hr over 75.43513326666667 minutes.',
+        'economics': {'adjusted_rate_mxn_hr': 47.95012875105086,
+                      'reservation_wage_mxn_hr': 80.0, 'total_time_min': 75.43513326666667},
+    }
+    class Capture:
+        payload = None
+        async def explain(self, payload):
+            self.payload = json.loads(payload)
+            return 'The adjusted rate is MXN 47.95/hour, below MXN 80.00/hour over 75.44 minutes.'
+    client = Capture()
+    result = asyncio.run(GeminiExplanationService(client).explain_facts(facts))
+    assert result and '47.95' in result and '75.44' in result
+    assert '47.950128' not in str(client.payload)
+    assert '80.00' in str(client.payload)
+    assert '75.44' in str(client.payload)
+    assert '47.950128' in facts['structured_reason']
+    fallback = fallback_explanation({'decision': 'SKIP', 'binding_constraint': 'reservation_wage',
+                                     'reason': facts['structured_reason'], 'economics': facts['economics']})
+    assert '47.95' in fallback and '80.00' in fallback and '75.44' in fallback
+    assert '47.950128' not in fallback
+    class Spanish:
+        async def explain(self, payload): return 'El pedido se rechazó porque la tarifa es baja.'
+    assert asyncio.run(GeminiExplanationService(Spanish()).explain_facts(facts)) is None

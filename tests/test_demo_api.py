@@ -126,3 +126,57 @@ def test_new_demo_evicts_oldest_disconnected_session():
         assert newest.id in service.sessions
         await service.close()
     asyncio.run(run())
+
+
+def test_demo_explanation_is_grounded_cached_and_keeps_decision():
+    from types import SimpleNamespace
+    import json
+    calls = []
+    class FakeGemini:
+        async def explain(self, payload):
+            calls.append(json.loads(payload))
+            return 'This order was skipped because completion would exceed the shift end by 100.89 minutes.'
+    def constrained_timeline(seed, injections, source=None):
+        result = timeline(seed, injections, source)
+        smart = result['agents']['smart']['decisions']['ONE']
+        smart.update(decision='SKIP', binding_constraint='shift_end_infeasible',
+                     reason='Skipped: shift_end_infeasible; estimated completion is 100.89 minutes after shift end, including existing work.')
+        return result
+    advisor = SimpleNamespace(config=SimpleNamespace(enabled=True, api_key='fake'), client=FakeGemini())
+    service = DemoService(runner=constrained_timeline)
+    with TestClient(create_app(demo_service=service, advisor=advisor)) as client:
+        identifier = client.post('/demo/simulations', json={'seed': 42}).json()['id']
+        with client.websocket_connect(f'/demo/simulations/{identifier}/ws') as socket:
+            state = socket.receive_json()['state']
+            if state['status'] == 'preparing':
+                state = socket.receive_json()['state']
+        path = f'/demo/simulations/{identifier}/decisions/ONE/explanation'
+        first = client.get(path)
+        assert first.status_code == 200
+        assert first.json()['source'] == 'gemini'
+        assert '100.89' in first.json()['explanation']
+        assert client.get(path).json() == first.json()
+        assert len(calls) == 1
+        assert set(calls[0]) == {'decision', 'structured_reason', 'binding_constraint', 'economics'}
+        assert 'seed' not in str(calls[0]) and 'future' not in str(calls[0])
+        assert client.get(f'/demo/simulations/{identifier}/decisions/ONE').json()['smart']['decision'] == 'SKIP'
+
+
+def test_demo_explanation_fallback_when_gemini_fails():
+    from types import SimpleNamespace
+    class FailingGemini:
+        async def explain(self, payload):
+            raise TimeoutError()
+    advisor = SimpleNamespace(config=SimpleNamespace(enabled=True, api_key='fake'), client=FailingGemini())
+    service = DemoService(runner=timeline)
+    with TestClient(create_app(demo_service=service, advisor=advisor)) as client:
+        identifier = client.post('/demo/simulations', json={'seed': 42}).json()['id']
+        with client.websocket_connect(f'/demo/simulations/{identifier}/ws') as socket:
+            state = socket.receive_json()['state']
+            if state['status'] == 'preparing':
+                socket.receive_json()
+        response = client.get(f'/demo/simulations/{identifier}/decisions/ONE/explanation')
+        assert response.status_code == 200
+        assert response.json()['source'] == 'fallback'
+        assert response.json()['llm_explanation'] is None
+        assert response.json()['explanation']

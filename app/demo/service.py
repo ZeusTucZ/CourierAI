@@ -16,6 +16,8 @@ class DemoSession:
         self.status, self.error = "preparing", None
         self.speed, self.offset, self.anchor = 25, 0., monotonic()
         self.injections, self.version = [], 0
+        self.explanations = {}
+        self.explanation_tasks = {}
         self.task = None
         self.subscribers = 0
         self.last_access = monotonic()
