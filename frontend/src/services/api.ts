@@ -10,7 +10,7 @@ async function request<T>(path: string, data?: object): Promise<T> {
 }
 export const api = {
   zones: () => request<ZoneCollection>('/geospatial/zones'),
-  start: (seed: number) => request<SimulationState>('/demo/simulations', { seed }),
+  start: (seed: number, shift_hours: number) => request<SimulationState>('/demo/simulations', { seed, shift_hours }),
   state: (id: string) => request<SimulationState>(`/demo/simulations/${id}`),
   control: (id: string, action: string, speed?: number) => request<SimulationState>(`/demo/simulations/${id}/control`, { action, ...(speed ? { speed } : {}) }),
   inject: (id: string, shock_type: Shock['shock_type']) => request<SimulationState>(`/demo/simulations/${id}/shocks`, { shock_type }),

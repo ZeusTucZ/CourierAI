@@ -29,7 +29,7 @@ class SLABucket(Model):
 class StrategyPolicy(Model):
     sla_distance_buckets: tuple[SLABucket, ...] = ()
     zone_value_clip: NonNegative = 50
-    base_reservation_wage: NonNegative = 165
+    base_reservation_wage: NonNegative = 80
     min_reservation_wage: NonNegative = 80
     max_reservation_wage: NonNegative = 250
     demand_adjustment_fraction: NonNegative = .1

@@ -10,6 +10,7 @@ import { ShiftCompleteModal } from './components/ShiftCompleteModal'
 export default function App() {
   const [state, setState] = useState<SimulationState | null>(null)
   const [seed, setSeed] = useState(202635)
+  const [shiftHours, setShiftHours] = useState(4)
   const [zones, setZones] = useState(new Map<number, Zone>())
   const [connected, setConnected] = useState(true)
   const [pending, setPending] = useState(false)
@@ -21,7 +22,7 @@ export default function App() {
   const latest = state?.orders.at(-1)
   useEffect(() => {
     const identifier = localStorage.getItem('courier-demo-session')
-    if (identifier) api.state(identifier).then(saved => { setState(saved); setSeed(saved.seed) }).catch(() => localStorage.removeItem('courier-demo-session'))
+    if (identifier) api.state(identifier).then(saved => { setState(saved); setSeed(saved.seed); setShiftHours(saved.shift_hours ?? 4) }).catch(() => localStorage.removeItem('courier-demo-session'))
   }, [])
   useEffect(() => { if (state?.id) localStorage.setItem('courier-demo-session', state.id) }, [state?.id])
   useEffect(() => { api.zones().then(data => setZones(new Map(data.features.map(f => [f.properties.zone_id, f.properties])))).catch(() => setError('Could not load zones. Check that the backend is running.')) }, [])
@@ -51,8 +52,8 @@ export default function App() {
     finally { setPending(false) }
   }
   function start() {
-    if (state && state.seed === seed && state.status !== 'error') void perform(() => api.control(state.id, 'start'))
-    else { setDismissed(false); void perform(() => api.start(seed)) }
+    if (state && state.seed === seed && state.shift_hours === shiftHours && state.status !== 'error') void perform(() => api.control(state.id, 'start'))
+    else { setDismissed(false); void perform(() => api.start(seed, shiftHours)) }
   }
   function control(action: string, speed?: number) {
     if (!state) return
@@ -61,7 +62,7 @@ export default function App() {
   }
   function inject(type: Shock['shock_type']) { if (state) void perform(() => api.inject(state.id, type)) }
   const progress = state?.start_time && state.end_time ? (state.elapsed_seconds ?? 0) / ((Date.parse(state.end_time) - Date.parse(state.start_time)) / 1000) * 100 : 0
-  return <div className="app-shell"><Header state={state} seed={seed} setSeed={setSeed} start={start} control={control} inject={inject} connected={connected} busy={!!busy}/>
+  return <div className="app-shell"><Header state={state} seed={seed} setSeed={setSeed} shiftHours={shiftHours} setShiftHours={setShiftHours} start={start} control={control} inject={inject} connected={connected} busy={!!busy}/>
     <div className="shift-progress"><div style={{ width: `${progress}%` }}/></div>
     {(error || state?.error) && <div className="error-banner" role="alert">{error || state?.error}<button onClick={() => setError(null)} aria-label="Dismiss error">×</button></div>}
     <div className="story-bar"><span>{busy ? <><span className="pulse-dot"/>{state?.status === 'updating' ? 'Applying event in the simulator… playback paused' : 'Preparing the OSM-backed shift…'}</> : latest ? <><b className="new-order-tag">NEW ORDER</b><strong>{latest.order_id}</strong><span>{zones.get(latest.zone_pickup)?.name ?? `Zone ${latest.zone_pickup}`} → {zones.get(latest.zone_dropoff)?.name ?? `Zone ${latest.zone_dropoff}`}</span></> : <><span className="live-dot"/> Two couriers. One shared order stream.</>}</span><small>{state?.status === 'paused' ? 'Ⅱ Playback paused' : state?.status === 'completed' ? '✓ Shift complete' : 'Watch what each agent chooses — and why.'}</small></div>

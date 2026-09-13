@@ -51,6 +51,16 @@ describe('Demo presentation uses recorded values', () => {
     expect(screen.getByText('ORD-ACTIVE-1')).toBeInTheDocument()
     expect(screen.getByText('ORD-ACTIVE-2')).toBeInTheDocument()
   })
+  it('shows every active order when the courier is batching', () => {
+    const batching = { ...agent, current_order: 'ORD-A', active_orders: [
+      { order_id: 'ORD-A', phase: 'to_pickup', pickup: [-100.289, 25.651] as [-100.289, 25.651], dropoff: [-100.3, 25.66] as [-100.3, 25.66], is_current: true },
+      { order_id: 'ORD-B', phase: 'to_dropoff', pickup: [-100.28, 25.65] as [-100.28, 25.65], dropoff: [-100.31, 25.67] as [-100.31, 25.67], is_current: false },
+    ] }
+    render(<AgentPanel agent="smart" state={batching} revision={0} evaluating={false}/>)
+    expect(screen.getByLabelText('2 órdenes activas')).toHaveTextContent('ORD-A')
+    expect(screen.getByLabelText('2 órdenes activas')).toHaveTextContent('ORD-B')
+    expect(screen.getByText('En camino a entregar')).toBeInTheDocument()
+  })
   it('opens an independent order history for each model', () => {
     const acceptedOrder = { ...order, order_id: 'ORD-ACCEPTED', decisions: { ...order.decisions, smart: { ...decision, order_id: 'ORD-ACCEPTED', decision: 'ACCEPT' as const } } }
     render(<AgentPanel agent="smart" state={agent} order={order} orders={[order, acceptedOrder]} zones={zones} revision={0} evaluating={false}/>)
@@ -93,5 +103,11 @@ describe('Demo presentation uses recorded values', () => {
     expect(screen.getByText('$527.10')).toBeInTheDocument()
     fireEvent.click(screen.getByText('Ⅱ Pause'))
     expect(control).toHaveBeenCalledWith('pause')
+  })
+  it('allows selecting the shift duration before starting', () => {
+    const setShiftHours = vi.fn()
+    render(<Header state={null} seed={42} setSeed={vi.fn()} shiftHours={4} setShiftHours={setShiftHours} start={vi.fn()} control={vi.fn()} inject={vi.fn()} connected busy={false}/>)
+    fireEvent.change(screen.getByLabelText('Shift duration'), { target: { value: '6' } })
+    expect(setShiftHours).toHaveBeenCalledWith(6)
   })
 })

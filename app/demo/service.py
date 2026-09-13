@@ -10,8 +10,8 @@ from app.demo.runner import run_demo
 
 
 class DemoSession:
-    def __init__(self, seed):
-        self.id, self.seed = uuid4().hex, seed
+    def __init__(self, seed, shift_hours=4):
+        self.id, self.seed, self.shift_hours = uuid4().hex, seed, shift_hours
         self.data = None
         self.status, self.error = "preparing", None
         self.speed, self.offset, self.anchor = 25, 0., monotonic()
@@ -37,7 +37,7 @@ class DemoSession:
     def state(self):
         elapsed = self.seconds()
         self.last_access = monotonic()
-        base = {"id": self.id, "seed": self.seed, "status": self.status, "speed": self.speed,
+        base = {"id": self.id, "seed": self.seed, "shift_hours": self.shift_hours, "status": self.status, "speed": self.speed,
                 "error": self.error, "revision": self.version}
         if not self.data:
             return {**base, "agents": {}, "orders": [], "shocks": [], "same_stream": False}
@@ -49,7 +49,7 @@ class DemoSession:
             frame = data["frames"][index] if index >= 0 else {"version": -1,
                 "position": self.data["start_position"], "zone": 7, "status": "idle", "action": None,
                 "net_earnings": 0, "current_order": None, "routes": [], "pickup": None,
-                "dropoff": None, "target": None, "completed": 0,
+                "dropoff": None, "active_orders": [], "target": None, "completed": 0,
                 "closures": {"type": "FeatureCollection", "features": []}}
             # Closures can expire between position events. Filter by the playback clock.
             closures = {**frame["closures"], "features": [f for f in frame["closures"]["features"]
@@ -82,25 +82,25 @@ class DemoService:
         self.sessions, self.runner = {}, runner
         self.executor = ProcessPoolExecutor(max_workers=1) if runner is run_demo else None
 
-    async def compute(self, seed, injections, source=None):
+    async def compute(self, seed, injections, source=None, shift_hours=4):
         if self.executor:
-            return await asyncio.get_running_loop().run_in_executor(self.executor, self.runner, seed, injections, source)
+            return await asyncio.get_running_loop().run_in_executor(self.executor, self.runner, seed, injections, source, shift_hours)
         return self.runner(seed, injections, source)
 
-    def create(self, seed):
+    def create(self, seed, shift_hours=4):
         for key, session in list(self.sessions.items()):
             if monotonic() - session.last_access > 3600 and not (session.task and not session.task.done()):
                 del self.sessions[key]
         if len(self.sessions) >= 8:
             raise ValueError("Eight demo sessions are already open; restart the demo service to clear them")
-        session = DemoSession(seed)
+        session = DemoSession(seed, shift_hours)
         self.sessions[session.id] = session
         session.task = asyncio.create_task(self.prepare(session))
         return session
 
     async def prepare(self, session):
         try:
-            session.data = await self.compute(session.seed, [])
+            session.data = await self.compute(session.seed, [], shift_hours=session.shift_hours)
             session.status, session.anchor = "running", monotonic()
         except Exception as exc:
             session.status, session.error = "error", str(exc)
@@ -165,7 +165,7 @@ class DemoService:
 
         async def rebuild():
             try:
-                revised = await self.compute(session.seed, session.injections + [event], session.data["source"])
+                revised = await self.compute(session.seed, session.injections + [event], session.data["source"], session.shift_hours)
                 # The past must not change when branching at the presentation cursor.
                 from app.simulation.replay import logical
                 for key in ("baseline", "smart"):

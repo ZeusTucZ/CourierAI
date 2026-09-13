@@ -7,7 +7,7 @@ const start: Coordinates = [-100.289, 25.651]
 const latlng = (p: Coordinates): L.LatLngExpression => [p[1], p[0]]
 const icon = (label: string, color: string) => L.divIcon({ className: 'map-marker-container', html: `<span class="map-marker" style="--marker-color:${color}">${label}</span>`, iconSize: [32, 32], iconAnchor: [16, 16] })
 
-export const CourierMap = memo(function CourierMap({ agent, state, revision }: { agent: AgentKey; state?: AgentState; revision: number }) {
+export const CourierMap = memo(function CourierMap({ agent, state, incomingPickup, revision }: { agent: AgentKey; state?: AgentState; incomingPickup?: Coordinates; revision: number }) {
   const element = useRef<HTMLDivElement>(null)
   const map = useRef<L.Map | null>(null)
   const layers = useRef<{ route: L.LayerGroup; closures: L.LayerGroup; courier: L.Marker; pins: L.LayerGroup } | null>(null)
@@ -25,7 +25,7 @@ export const CourierMap = memo(function CourierMap({ agent, state, revision }: {
     observer.observe(element.current)
     return () => { observer.disconnect(); instance.remove(); map.current = null; layers.current = null }
   }, [agent])
-  const frameKey = `${revision}:${state?.version ?? -1}:${state?.closures.features.length ?? 0}`
+  const frameKey = `${revision}:${state?.version ?? -1}:${state?.closures.features.length ?? 0}:${incomingPickup?.join(',') ?? ''}`
   useEffect(() => {
     const overlay = layers.current
     if (!overlay || !map.current) return
@@ -37,7 +37,8 @@ export const CourierMap = memo(function CourierMap({ agent, state, revision }: {
       bounds.extend(layer.getBounds())
     }
     if (state) L.geoJSON(state.closures, { style: { color: '#e38412', weight: 7, dashArray: '5 6' } }).addTo(overlay.closures)
-    for (const [coordinates, label, color, title] of [[state?.pickup, 'P', '#16826a', 'Pickup'], [state?.dropoff, 'D', '#d86361', 'Dropoff'], [agent === 'smart' ? state?.target : null, 'T', '#0891b2', 'Target zone']] as const) {
+    const activePins = state?.active_orders?.flatMap(order => [[order.pickup, 'P', '#16826a', `Pickup · ${order.order_id}`], [order.dropoff, 'D', '#d86361', `Dropoff · ${order.order_id}`]] as const) ?? [[state?.pickup, 'P', '#16826a', 'Pickup'], [state?.dropoff, 'D', '#d86361', 'Dropoff']]
+    for (const [coordinates, label, color, title] of [...activePins, [incomingPickup, 'R', '#c67717', 'Restaurante de la orden entrante'], [agent === 'smart' ? state?.target : null, 'T', '#0891b2', 'Target zone']] as const) {
       if (coordinates) { L.marker(latlng(coordinates), { icon: icon(label, color) }).bindTooltip(title).addTo(overlay.pins); bounds.extend(latlng(coordinates)) }
     }
     if (bounds.isValid() && (state?.routes.length || 0) > 0) map.current.fitBounds(bounds, { padding: [45, 45], maxZoom: 14, animate: false })
@@ -47,6 +48,6 @@ export const CourierMap = memo(function CourierMap({ agent, state, revision }: {
   return <div className="map-shell"><div ref={element} className="courier-map" role="img" aria-label={`${agent === 'smart' ? 'Smart' : 'Baseline'} map of Monterrey`} />
     <div className="map-location">◎ Monterrey, Nuevo León</div>
     {tileError && <div className="tile-warning">Map tiles unavailable · route data retained</div>}
-    <div className="map-legend"><span><i className={`legend-line ${agent}`}/> Route</span><span><b className="pickup-dot"/> Pickup</span><span><b className="dropoff-dot"/> Dropoff</span></div>
+    <div className="map-legend"><span><i className={`legend-line ${agent}`}/> Route</span><span><b className="restaurant-dot"/> Restaurant</span><span><b className="pickup-dot"/> Pickup</span><span><b className="dropoff-dot"/> Dropoff</span></div>
   </div>
 })

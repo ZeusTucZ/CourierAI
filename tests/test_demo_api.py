@@ -14,6 +14,8 @@ def timeline(seed, injections, source=None):
     decision = {"event": "decision", "order_id": "ONE", "sim_time": start, "decision": "ACCEPT", "reason": "Recorded fixture reason.", "latency_ms": 1}
     frame = {"sim_time": start, "version": 0, "position": [-100.289,25.651], "zone": 7, "net_earnings": 100,
              "current_order": "ONE", "status": "to_dropoff", "routes": [{"edge_path": [[1,2,0],[2,3,0],[3,4,0]]}],
+             "active_orders": [{"order_id": "ONE", "phase": "to_dropoff", "pickup": [-100.289,25.651],
+                                "dropoff": [-100.3,25.66], "is_current": True}],
              "closures": {"type":"FeatureCollection","features":[]}}
     data = {"frames": [frame], "decisions": {"ONE":decision}, "offers": {"ONE":{}}, "detours": [], "metrics": {"net_earnings_mxn":100}}
     return {"seed":seed,"source":source or [{"event":"order_offered","order_id":"ONE","sim_time":start}],
@@ -30,7 +32,7 @@ def service():
 
 def test_live_api_start_socket_decision_pause_reset(service):
     with TestClient(create_app(demo_service=service)) as client:
-        response=client.post('/demo/simulations',json={"seed":42})
+        response=client.post('/demo/simulations',json={"seed":42, "shift_hours":2})
         assert response.status_code==202
         identifier=response.json()['id']
         with client.websocket_connect(f'/demo/simulations/{identifier}/ws') as socket:
@@ -38,7 +40,9 @@ def test_live_api_start_socket_decision_pause_reset(service):
             if state['status']=='preparing':
                 state=socket.receive_json()['state']
             assert state['same_stream'] is True
+            assert state['shift_hours'] == 2
             assert state['orders'][0]['order_id']=='ONE'
+            assert state['agents']['smart']['active_orders'][0]['order_id']=='ONE'
         details=client.get(f'/demo/simulations/{identifier}/decisions/ONE').json()
         assert details['smart']['reason']=='Recorded fixture reason.'
         assert client.post(f'/demo/simulations/{identifier}/control',json={"action":"pause"}).json()['status']=='paused'
