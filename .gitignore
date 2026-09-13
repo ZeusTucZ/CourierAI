@@ -6,3 +6,4 @@ artifacts/
 evaluation/*_results/
 data/raw/
 data/processed/
+data/osm/

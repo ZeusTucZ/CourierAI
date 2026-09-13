@@ -1,0 +1,20 @@
+{
+  "version": "monterrey-representative-points-v1",
+  "method": "Team-selected approximate central reference points, snapped to nearest drive node. Not official boundaries or computed centroids. Coordinates are rounded map references, not historical dataset coordinates.",
+  "source": "https://www.openstreetmap.org/#map=12/25.7040/-100.3200",
+  "bbox": [-100.49, 25.60, -100.14, 25.81],
+  "zones": [
+    {"zone_id": 1, "name": "Centro / Macroplaza", "latitude": 25.6692, "longitude": -100.3099, "municipality": "Monterrey"},
+    {"zone_id": 2, "name": "San Pedro Centro", "latitude": 25.6573, "longitude": -100.4023, "municipality": "San Pedro Garza García"},
+    {"zone_id": 3, "name": "Valle Oriente", "latitude": 25.6475, "longitude": -100.3355, "municipality": "San Pedro Garza García"},
+    {"zone_id": 4, "name": "Obispado", "latitude": 25.6750, "longitude": -100.3450, "municipality": "Monterrey"},
+    {"zone_id": 5, "name": "Mitras Centro", "latitude": 25.7040, "longitude": -100.3500, "municipality": "Monterrey"},
+    {"zone_id": 6, "name": "Cumbres", "latitude": 25.7270, "longitude": -100.3900, "municipality": "Monterrey"},
+    {"zone_id": 7, "name": "Tecnológico", "latitude": 25.6510, "longitude": -100.2890, "municipality": "Monterrey"},
+    {"zone_id": 8, "name": "Contry", "latitude": 25.6280, "longitude": -100.2780, "municipality": "Monterrey"},
+    {"zone_id": 9, "name": "Guadalupe Centro", "latitude": 25.6775, "longitude": -100.2597, "municipality": "Guadalupe"},
+    {"zone_id": 10, "name": "San Nicolás Centro", "latitude": 25.7520, "longitude": -100.2950, "municipality": "San Nicolás de los Garza"},
+    {"zone_id": 11, "name": "Apodaca Centro", "latitude": 25.7810, "longitude": -100.1880, "municipality": "Apodaca"},
+    {"zone_id": 12, "name": "Santa Catarina Centro", "latitude": 25.6730, "longitude": -100.4580, "municipality": "Santa Catarina"}
+  ]
+}

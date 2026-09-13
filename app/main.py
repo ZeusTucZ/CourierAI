@@ -1,4 +1,6 @@
 from time import perf_counter_ns
+from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -11,8 +13,19 @@ from app.models.strategy import StrategySnapshot
 from app.services.strategy_store import StrategyStore
 
 
-def create_app(snapshot: StrategySnapshot | None = None) -> FastAPI:
-    application = FastAPI(title="Courier Fast Decision Engine", version="0.1.0")
+def create_app(snapshot: StrategySnapshot | None = None, *, routing_service=None, geospatial_runs=None) -> FastAPI:
+    from app.geospatial.api import router as geographic_router
+    from app.geospatial.service import RoutingService
+    from app.geospatial.zones import ROOT
+
+    @asynccontextmanager
+    async def lifespan(application):
+        yield
+        application.state.routing.close()
+
+    application = FastAPI(title="Courier Fast Decision Engine", version="0.1.0", lifespan=lifespan)
+    application.state.routing = routing_service or RoutingService(ROOT / "data/osm")
+    application.state.geospatial_runs = Path(geospatial_runs or ROOT / "artifacts/geospatial/runs")
     application.state.decisions = DecisionService(
         StrategyStore(snapshot or StrategySnapshot()), DecisionLog(),
     )
@@ -31,6 +44,7 @@ def create_app(snapshot: StrategySnapshot | None = None) -> FastAPI:
         return await call_next(request)
 
     application.include_router(router)
+    application.include_router(geographic_router)
     return application
 
 

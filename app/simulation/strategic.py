@@ -110,7 +110,7 @@ class StrategicSimulator(Simulator):
     def _maybe_reposition(self):
         if self.move or not isinstance(self.agent, SmartAgent):
             return
-        action = choose_reposition(self.state, self.agent.snapshot, self.policy, self.last_move, self.world.rain_factor)
+        action = self._reposition_action()
         if action is None:
             return
         now = self.state.current_sim_time
@@ -131,6 +131,9 @@ class StrategicSimulator(Simulator):
         self._trace("reposition_started", target_zone=action.zone, distance_km=action.distance_km,
                     expected_gain_mxn=action.gain_mxn, expected_cost_mxn=action.operating_cost_mxn)
         self._position(action="reposition_started", target_zone=action.zone)
+
+    def _reposition_action(self):
+        return choose_reposition(self.state, self.agent.snapshot, self.policy, self.last_move, self.world.rain_factor)
 
     def _sync_route(self):
         """Insert newly created delay phases while preserving existing stop order."""
@@ -212,18 +215,28 @@ class StrategicSimulator(Simulator):
                 self._earnings(completed_order_id=job.offer.order_id, late=late,
                     disruption_caused_lateness=disrupted, promised_completion_time=job.promised_completion_time.isoformat())
 
-    def _offer(self, source):
-        started = perf_counter_ns()
+    def _prepare_offer(self, source):
         # Same source world, independently observable pickup travel from actual position.
         adjusted = {**source, "distance_pickup_km": source["distance_pickup_km"] + zone_distance(
             self.state.current_zone, source["zone_pickup"], self.policy.synthetic_zone_spacing_km)}
-        order = self.world.prepare_offer(adjusted, self.agent.snapshot)
+        return self.world.prepare_offer(adjusted, self.agent.snapshot)
+
+    def _candidate(self, job, request):
+        return insert_order(self.route, job, self.state.in_flight_orders, request, self.agent.snapshot,
+            self.policy, improved=isinstance(self.agent, SmartAgent) and self.policy.use_improved_batching) if not self.move else None
+
+    def _commit_candidate(self, sequence, job):
+        self.route = sequence
+        self.state.in_flight_orders.append(job)
+
+    def _offer(self, source):
+        order = self._prepare_offer(source)
         request = decision_request(order, self.state)
         self._emit("order_offered", **order.model_dump(mode="json", exclude={"event", "sim_time", "courier_state_overrides"}, exclude_none=True), source_event=source)
         deadline = compute_delivery_deadline(order, self.state, self.policy)
         job = ActiveOrder.accepted(order, self.agent.snapshot, deadline)
-        candidate = insert_order(self.route, job, self.state.in_flight_orders, request, self.agent.snapshot,
-            self.policy, improved=isinstance(self.agent, SmartAgent) and self.policy.use_improved_batching) if not self.move else None
+        candidate = self._candidate(job, request)
+        started = perf_counter_ns()
         if candidate:
             sequence, plan = candidate
             response = self.agent.service.decide(request, plan=plan) if isinstance(self.agent, SmartAgent) else self.agent.decide_request(request)
@@ -239,8 +252,7 @@ class StrategicSimulator(Simulator):
                    delivery_deadline=deadline.isoformat(), insertion_feasible=candidate is not None,
                    planned_route=[[step.order_id, step.phase.kind] for step in candidate[0]] if candidate else [])
         if response.decision == "ACCEPT":
-            self.route = candidate[0]
-            self.state.in_flight_orders.append(job)
+            self._commit_candidate(candidate[0], job)
             self.state.orders_accepted += 1
             self._drain_finished_phases()
         else:

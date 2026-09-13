@@ -221,12 +221,15 @@ class Simulator:
             if shock.shock_type == "delay" and job.offer.order_id == shock.order_id:
                 job.add_delay(shock.slip_min)
             if shock.shock_type == "closure" and (shock.zone is None or shock.zone in {job.offer.zone_pickup, job.offer.zone_dropoff}):
-                job.add_delay(self.config.simulation.closure_delay_min)
+                self._closure_delay(job)
         self._rescale_rain(before)
         if expiry:
             self._push(expiry, 1, "expiry", shock_id)
         self._drain_finished_phases()
         self._refresh_execution()
+
+    def _closure_delay(self, job):
+        job.add_delay(self.config.simulation.closure_delay_min)
 
     def _rescale_rain(self, before: float):
         factor = self.world.rain_factor / before
