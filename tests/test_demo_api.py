@@ -107,3 +107,22 @@ def test_failed_preparation_is_visible_and_not_fake_success():
         assert s.state()['status']=='error' and 'OSM graph missing' in s.state()['error']
         await service.close()
     asyncio.run(run())
+
+
+def test_new_demo_evicts_oldest_disconnected_session():
+    async def run():
+        service = DemoService(runner=timeline)
+        sessions = []
+        for seed in range(8):
+            current = service.create(seed)
+            await current.task
+            sessions.append(current)
+        sessions[0].subscribers = 1
+        newest = service.create(8)
+        await newest.task
+        assert len(service.sessions) == 8
+        assert sessions[0].id in service.sessions
+        assert sessions[1].id not in service.sessions
+        assert newest.id in service.sessions
+        await service.close()
+    asyncio.run(run())

@@ -5,3 +5,4 @@ osmnx>=2.0,<3
 networkx>=3.4,<4
 scikit-learn>=1.5,<2
 websockets>=13,<16
+google-genai>=1.0,<2

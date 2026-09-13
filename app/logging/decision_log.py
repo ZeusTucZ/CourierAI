@@ -46,3 +46,9 @@ class DecisionLog:
                 "economics": response.economics,
                 "decision_details": deepcopy(decision_details),
             })
+
+    def attach_llm_explanation(self, order_id: str, explanation: str) -> None:
+        with self._lock:
+            records = self._records.get(order_id)
+            if records:
+                records[-1] = records[-1].model_copy(update={'llm_explanation': explanation})

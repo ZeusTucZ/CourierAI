@@ -17,6 +17,7 @@ class DemoSession:
         self.speed, self.offset, self.anchor = 25, 0., monotonic()
         self.injections, self.version = [], 0
         self.task = None
+        self.subscribers = 0
         self.last_access = monotonic()
         self.rewound = False
 
@@ -89,10 +90,16 @@ class DemoService:
 
     def create(self, seed, shift_hours=4):
         for key, session in list(self.sessions.items()):
-            if monotonic() - session.last_access > 3600 and not (session.task and not session.task.done()):
+            if (monotonic() - session.last_access > 3600 and session.subscribers == 0
+                    and not (session.task and not session.task.done())):
                 del self.sessions[key]
         if len(self.sessions) >= 8:
-            raise ValueError("Eight demo sessions are already open; restart the demo service to clear them")
+            candidates = [session for session in self.sessions.values()
+                if session.subscribers == 0 and not (session.task and not session.task.done())]
+            if not candidates:
+                raise ValueError("Eight demo sessions are currently active; close an older demo tab before starting another")
+            oldest = min(candidates, key=lambda session: session.last_access)
+            del self.sessions[oldest.id]
         session = DemoSession(seed, shift_hours)
         self.sessions[session.id] = session
         session.task = asyncio.create_task(self.prepare(session))

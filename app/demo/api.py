@@ -80,9 +80,12 @@ async def updates(websocket: WebSocket, identifier: str):
         await websocket.close(code=4404, reason="Demo session not found")
         return
     try:
+        current.subscribers += 1
         while True:
             state = current.state()
             await websocket.send_json({"type": "simulation_completed" if state["status"] == "completed" else "state", "state": state})
             await asyncio.sleep(.25)
     except (WebSocketDisconnect, RuntimeError, OSError):
         return
+    finally:
+        current.subscribers -= 1

@@ -38,6 +38,21 @@ class DecideResponse(Model):
     tier: Literal["tier1"] = "tier1"
     degraded: bool = False
     economics: Economics | None = None
+    gemini_enabled: bool = False
+    gemini_model: str | None = None
+    gemini_advice: dict[str, Any] | None = None
+    gemini_confidence: float | None = None
+    gemini_demand_outlook: str | None = None
+    gemini_destination_quality: str | None = None
+    gemini_opportunity_risk: str | None = None
+    llm_adjustment_mxn_hr: float = 0
+    pre_llm_adjusted_rate: float | None = None
+    post_llm_adjusted_rate: float | None = None
+    llm_changed_decision: bool = False
+    llm_explanation: str | None = None
+    gemini_latency_ms: float | None = None
+    gemini_cache_hit: bool = False
+    gemini_error: str | None = None
 
     @model_serializer(mode="wrap")
     def serialize_response(self, handler):
@@ -65,6 +80,7 @@ class DecisionRecord(DecideResponse):
     strategy_snapshot: dict[str, Any]
     alternatives_considered: tuple[Alternative, ...]
     decision_details: dict[str, Any] | None = None
+    structured_reason: str | None = None
 
     @model_serializer(mode="wrap")
     def serialize_record(self, handler):

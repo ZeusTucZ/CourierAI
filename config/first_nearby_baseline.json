@@ -1,6 +1,6 @@
 {
   "version": "first-nearby-v1",
-  "max_distance_km": 5,
+  "max_distance_km": 10,
   "percentile": 75.0,
   "sample_size": 31654,
   "observed_total_sample_size": 0,

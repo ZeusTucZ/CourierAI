@@ -13,7 +13,7 @@ from app.models.strategy import StrategySnapshot
 from app.services.strategy_store import StrategyStore
 
 
-def create_app(snapshot: StrategySnapshot | None = None, *, routing_service=None, geospatial_runs=None, demo_service=None) -> FastAPI:
+def create_app(snapshot: StrategySnapshot | None = None, *, routing_service=None, geospatial_runs=None, demo_service=None, advisor=None) -> FastAPI:
     from app.geospatial.api import router as geographic_router
     from app.geospatial.service import RoutingService
     from app.geospatial.zones import ROOT
@@ -30,8 +30,14 @@ def create_app(snapshot: StrategySnapshot | None = None, *, routing_service=None
     application.state.routing = routing_service or RoutingService(ROOT / "data/osm")
     application.state.demo = demo_service or DemoService()
     application.state.geospatial_runs = Path(geospatial_runs or ROOT / "artifacts/geospatial/runs")
+    if advisor is None:
+        from app.llm.gemini_client import GeminiClient, GeminiConfig
+        from app.llm.strategy_advisor import GeminiStrategyAdvisor
+        gemini_config = GeminiConfig.from_env()
+        if gemini_config.enabled:
+            advisor = GeminiStrategyAdvisor(GeminiClient(gemini_config), gemini_config)
     application.state.decisions = DecisionService(
-        StrategyStore(snapshot or StrategySnapshot()), DecisionLog(),
+        StrategyStore(snapshot or StrategySnapshot()), DecisionLog(), advisor,
     )
 
     @application.exception_handler(RequestValidationError)

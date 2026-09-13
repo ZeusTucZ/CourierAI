@@ -14,6 +14,7 @@ class SmartAgent:
         self.snapshot = snapshot or StrategySnapshot()
         self.service = DecisionService(StrategyStore(self.snapshot), DecisionLog())
 
+
     def decide(self, order, courier_state):
         return self.decide_request(decision_request(order, courier_state))
 
@@ -78,3 +79,19 @@ class SmartAgent:
             "required_time_value_mxn": score.required_time_value_mxn,
             "final_score_mxn": score.final_score,
         }
+
+class SmartAgentNoLLM(SmartAgent):
+    name = 'SmartAgentNoLLM'
+
+
+class SmartAgentWithGemini(SmartAgent):
+    name = 'SmartAgentWithGemini'
+
+    def __init__(self, snapshot=None, advisor=None):
+        super().__init__(snapshot)
+        if advisor is None:
+            from app.llm.gemini_client import GeminiClient, GeminiConfig
+            from app.llm.strategy_advisor import GeminiStrategyAdvisor
+            config = GeminiConfig.from_env()
+            advisor = GeminiStrategyAdvisor(GeminiClient(config), config)
+        self.service.advisor = advisor
