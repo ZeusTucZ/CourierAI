@@ -12,3 +12,4 @@ frontend/dist/
 frontend/test-results/
 frontend/playwright-report/
 .env.gemini.local
+.env.elevenlabs.local

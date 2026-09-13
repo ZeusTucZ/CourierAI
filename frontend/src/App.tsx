@@ -18,9 +18,54 @@ export default function App() {
   const [evaluating, setEvaluating] = useState<string | null>(null)
   const [banner, setBanner] = useState<Shock | null>(null)
   const [routeUpdate, setRouteUpdate] = useState(false)
+  const [speechEnabled, setSpeechEnabled] = useState(false)
   const [dismissed, setDismissed] = useState(false)
   const lastShock = useRef('')
+  const spokenSession = useRef<string | null>(null)
+  const seenRouteEvents = useRef(new Set<string>())
+  const silentFastForward = useRef(false)
+  const speechRequest = useRef<AbortController | null>(null)
+  const speechAudio = useRef<HTMLAudioElement | null>(null)
+  const speechUrl = useRef<string | null>(null)
   const latest = state?.orders.at(-1)
+  function stopSpeech() {
+    speechRequest.current?.abort()
+    speechRequest.current = null
+    speechAudio.current?.pause()
+    speechAudio.current = null
+    if (speechUrl.current) URL.revokeObjectURL(speechUrl.current)
+    speechUrl.current = null
+  }
+  useEffect(() => { api.speechStatus().then(result => setSpeechEnabled(result.enabled)).catch(() => setSpeechEnabled(false)) }, [])
+  useEffect(() => () => stopSpeech(), [])
+  useEffect(() => {
+    if (!state?.id) return
+    if (spokenSession.current !== state.id) {
+      stopSpeech()
+      spokenSession.current = state.id
+      seenRouteEvents.current = new Set(state.shocks.map(shock => shock.id))
+      silentFastForward.current = false
+      return
+    }
+    const fresh = state.shocks.filter(shock => !seenRouteEvents.current.has(shock.id))
+    state.shocks.forEach(shock => seenRouteEvents.current.add(shock.id))
+    if (state.status === 'completed') { stopSpeech(); return }
+    if (!speechEnabled || silentFastForward.current) return
+    const event = fresh.reverse().find(shock => shock.shock_type === 'rain' || shock.shock_type === 'closure' || shock.shock_type === 'delay')
+    if (!event) return
+    stopSpeech()
+    const controller = new AbortController()
+    speechRequest.current = controller
+    void api.routeSpeech(state.id, event.id, controller.signal).then(blob => {
+      if (controller.signal.aborted || silentFastForward.current) return
+      const url = URL.createObjectURL(blob)
+      const audio = new Audio(url)
+      speechUrl.current = url
+      speechAudio.current = audio
+      audio.onended = () => { if (speechAudio.current === audio) stopSpeech() }
+      void audio.play().catch(() => { if (speechAudio.current === audio) stopSpeech() })
+    }).catch(() => {})
+  }, [state?.id, state?.shocks, state?.status, speechEnabled])
   useEffect(() => {
     const identifier = localStorage.getItem('courier-demo-session')
     if (identifier) api.state(identifier).then(saved => { setState(saved); setSeed(saved.seed); setShiftHours(saved.shift_hours ?? 4) }).catch(() => localStorage.removeItem('courier-demo-session'))
@@ -56,11 +101,14 @@ export default function App() {
     finally { setPending(false) }
   }
   function start() {
+    silentFastForward.current = false
     if (state && state.seed === seed && state.shift_hours === shiftHours && state.status !== 'error') void perform(() => api.control(state.id, 'start'))
     else { setDismissed(false); void perform(() => api.start(seed, shiftHours)) }
   }
   function control(action: string, speed?: number) {
     if (!state) return
+    if (action === 'complete' || action === 'reset') { silentFastForward.current = true; stopSpeech() }
+    if (action === 'reset') seenRouteEvents.current.clear()
     if (action === 'reset') { setDismissed(false); lastShock.current = ''; setBanner(null) }
     void perform(() => api.control(state.id, action, speed))
   }

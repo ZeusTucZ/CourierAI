@@ -16,6 +16,12 @@ export const api = {
   inject: (id: string, shock_type: Shock['shock_type']) => request<SimulationState>(`/demo/simulations/${id}/shocks`, { shock_type }),
   decision: (id: string, order: string) => request<Record<AgentKey, Decision>>(`/demo/simulations/${id}/decisions/${encodeURIComponent(order)}`),
   explanation: (id: string, order: string) => request<DecisionExplanationResult>(`/demo/simulations/${id}/decisions/${encodeURIComponent(order)}/explanation`),
+  speechStatus: () => request<{ enabled: boolean }>('/demo/speech/status'),
+  routeSpeech: async (id: string, eventId: string, signal: AbortSignal) => {
+    const response = await fetch(`/demo/speech/simulations/${encodeURIComponent(id)}/route-events/${encodeURIComponent(eventId)}`, { method: 'POST', signal })
+    if (!response.ok) throw new Error(`Speech unavailable (${response.status})`)
+    return response.blob()
+  },
 }
 
 export interface DecisionExplanationResult {

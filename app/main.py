@@ -18,6 +18,7 @@ def create_app(snapshot: StrategySnapshot | None = None, *, routing_service=None
     from app.geospatial.service import RoutingService
     from app.geospatial.zones import ROOT
     from app.demo.api import router as demo_router
+    from app.demo.speech import router as speech_router
     from app.demo.service import DemoService
 
     @asynccontextmanager
@@ -56,6 +57,7 @@ def create_app(snapshot: StrategySnapshot | None = None, *, routing_service=None
     application.include_router(router)
     application.include_router(geographic_router)
     application.include_router(demo_router)
+    application.include_router(speech_router)
     return application
 
 

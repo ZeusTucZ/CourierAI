@@ -2,6 +2,12 @@ import { test, expect } from '@playwright/test'
 
 test('real backend: both maps, shared orders, explanation, pause and reset', async ({ page }) => {
   const errors: string[] = []
+  let speechRequests = 0
+  await page.route('**/demo/speech/status', route => route.fulfill({ json: { enabled: true } }))
+  await page.route('**/demo/speech/simulations/**/route-events/**', route => {
+    speechRequests += 1
+    return route.fulfill({ status: 200, contentType: 'audio/mpeg', body: 'test-audio' })
+  })
   page.on('pageerror', error => errors.push(error.message))
   await page.goto('/')
   await expect(page.getByRole('img', { name: 'Baseline map of Monterrey' })).toBeVisible()
@@ -29,9 +35,14 @@ test('real backend: both maps, shared orders, explanation, pause and reset', asy
   await expect(page.locator('.shock-card').filter({ hasText: 'Road closure' })).toBeVisible({ timeout: 150000 })
   await page.getByText('Route recalculation history').click()
   await expect(page.locator('.route-log-entry').filter({ hasText: 'Road closure' })).toBeVisible()
+  await expect.poll(() => speechRequests).toBe(1)
   await expect(page.locator('.error-banner')).toHaveCount(0)
   await page.screenshot({ path: '../artifacts/frontend/desktop-closure.png', fullPage: true })
-  await page.getByRole('button', { name: 'Reset simulation' }).click()
+  await page.getByRole('button', { name: '⏩ Simulate shift' }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await page.waitForTimeout(500)
+  expect(speechRequests).toBe(1)
+  await page.getByRole('button', { name: '↺ Replay this shift' }).click()
   await expect(page.locator('.order-card')).toHaveCount(0)
   await expect(page.locator('.route-log-entry')).toHaveCount(0)
   await expect(page.locator('.current-order strong').first()).toHaveText('Waiting for first order')
