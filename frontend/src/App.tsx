@@ -23,6 +23,7 @@ export default function App() {
   const lastShock = useRef('')
   const spokenSession = useRef<string | null>(null)
   const seenRouteEvents = useRef(new Set<string>())
+  const spokenAcceptedOrders = useRef(new Set<string>())
   const silentFastForward = useRef(false)
   const speechRequest = useRef<AbortController | null>(null)
   const speechAudio = useRef<HTMLAudioElement | null>(null)
@@ -44,6 +45,9 @@ export default function App() {
       stopSpeech()
       spokenSession.current = state.id
       seenRouteEvents.current = new Set(state.shocks.map(shock => shock.id))
+      spokenAcceptedOrders.current = new Set(state.orders
+        .filter(order => order.decisions.smart?.decision === 'ACCEPT')
+        .map(order => order.order_id))
       silentFastForward.current = false
       return
     }
@@ -66,6 +70,25 @@ export default function App() {
       void audio.play().catch(() => { if (speechAudio.current === audio) stopSpeech() })
     }).catch(() => {})
   }, [state?.id, state?.shocks, state?.status, speechEnabled])
+  useEffect(() => {
+    if (!state?.id || !speechEnabled || silentFastForward.current || state.status === 'completed') return
+    const accepted = state.orders.find(order => order.decisions.smart?.decision === 'ACCEPT' && !spokenAcceptedOrders.current.has(order.order_id))
+    if (!accepted) return
+    // Record before requesting audio: WebSocket updates arrive four times a second.
+    spokenAcceptedOrders.current.add(accepted.order_id)
+    stopSpeech()
+    const controller = new AbortController()
+    speechRequest.current = controller
+    void api.acceptedOrderSpeech(state.id, accepted.order_id, controller.signal).then(blob => {
+      if (controller.signal.aborted) return
+      const url = URL.createObjectURL(blob)
+      const audio = new Audio(url)
+      speechUrl.current = url
+      speechAudio.current = audio
+      audio.onended = () => { if (speechAudio.current === audio) stopSpeech() }
+      void audio.play().catch(() => { if (speechAudio.current === audio) stopSpeech() })
+    }).catch(() => {})
+  }, [state?.id, state?.orders, state?.status, speechEnabled])
   useEffect(() => {
     const identifier = localStorage.getItem('courier-demo-session')
     if (identifier) api.state(identifier).then(saved => { setState(saved); setSeed(saved.seed); setShiftHours(saved.shift_hours ?? 4) }).catch(() => localStorage.removeItem('courier-demo-session'))

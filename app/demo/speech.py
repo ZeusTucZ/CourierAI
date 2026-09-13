@@ -54,3 +54,32 @@ async def speak_route_event(identifier: str, event_id: str, request: Request):
     except httpx.HTTPError as exc:
         raise HTTPException(502, 'ElevenLabs speech request failed') from exc
     return Response(result.content, media_type='audio/mpeg', headers={'Cache-Control': 'no-store'})
+
+
+@router.post('/simulations/{identifier}/accepted-orders/{order_id}')
+async def speak_accepted_order(identifier: str, order_id: str, request: Request):
+    """Narrate only an acceptance that is already visible in the playback."""
+    if not enabled():
+        raise HTTPException(503, 'ElevenLabs speech is not configured')
+    try:
+        current = request.app.state.demo.get(identifier).state()
+    except KeyError as exc:
+        raise HTTPException(404, 'Demo session not found') from exc
+    order = next((item for item in current['orders'] if item['order_id'] == order_id), None)
+    if not order or (order['decisions'].get('smart') or {}).get('decision') != 'ACCEPT':
+        raise HTTPException(404, 'Accepted Smart order not found in this playback')
+
+    voice_id = os.getenv('ELEVENLABS_VOICE_ID', VOICE_ID)
+    model_id = os.getenv('ELEVENLABS_MODEL_ID', 'eleven_multilingual_v2')
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            result = await client.post(
+                f'https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream',
+                params={'output_format': 'mp3_44100_128'},
+                headers={'xi-api-key': os.environ['ELEVENLABS_API_KEY']},
+                json={'text': 'Tienes un pedido nuevo.', 'model_id': model_id},
+            )
+        result.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise HTTPException(502, 'ElevenLabs speech request failed') from exc
+    return Response(result.content, media_type='audio/mpeg', headers={'Cache-Control': 'no-store'})

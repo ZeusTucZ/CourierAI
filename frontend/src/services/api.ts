@@ -26,6 +26,11 @@ export const api = {
     if (!response.ok) throw new Error(`Speech unavailable (${response.status})`)
     return response.blob()
   },
+  acceptedOrderSpeech: async (id: string, orderId: string, signal: AbortSignal) => {
+    const response = await fetch(`${apiBaseUrl}/demo/speech/simulations/${encodeURIComponent(id)}/accepted-orders/${encodeURIComponent(orderId)}`, { method: 'POST', signal })
+    if (!response.ok) throw new Error(`Speech unavailable (${response.status})`)
+    return response.blob()
+  },
 }
 
 export interface DecisionExplanationResult {
