@@ -11,7 +11,7 @@ No publiques los archivos `.env.*.local`. Ya están excluidos por `.gitignore`.
 1. En [Render](https://render.com), crea **New > Blueprint** e importa el repositorio.
 2. Render detectará `render.yaml`. Confirma el servicio `courier-api` en el plan **Free**.
 3. En las variables de entorno, agrega `CORS_ORIGINS` con la URL de producción de Vercel, por ejemplo `https://courier-demo.vercel.app`. Para probar antes de tener esa URL, usa temporalmente `*`.
-4. Render construye y compacta el grafo de calles de Monterrey durante el build. Es normal que este primer deploy tarde más que un despliegue normal; el grafo no se descarga al iniciar una simulación.
+4. Render descomprime y compacta un snapshot versionado del grafo de calles de Monterrey durante el build. No depende de una descarga externa ni descarga el grafo al iniciar una simulación.
 5. Si se mostrarán explicaciones o voz reales, agrega también `GEMINI_ENABLED=true`, `GEMINI_API_KEY` y/o `ELEVENLABS_API_KEY`. Si no, la demo funciona con los fallbacks y sin exponer claves.
 6. Al terminar, copia la URL de Render, por ejemplo `https://courier-api.onrender.com`, y comprueba `https://courier-api.onrender.com/healthz`.
 

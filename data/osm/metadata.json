@@ -1,0 +1,30 @@
+{
+  "graph_version": "5901035e88293822715b09b5e1352cc7a871147ed69dc9d39150b8868d52871b",
+  "generated_at": "2026-09-13T04:21:17.008432+00:00",
+  "area": "Monterrey metropolitan reference bbox",
+  "bbox": [
+    -100.49,
+    25.6,
+    -100.14,
+    25.81
+  ],
+  "network_type": "drive",
+  "node_count": 87684,
+  "edge_count": 222861,
+  "snapping_policy": "nearest node in largest strongly connected component; full graph retained",
+  "zone_mapping_version": "8d6eb7e9e6869b4faa998305ecb0fd307fc144e9fc4293e10fdf826217cbc2ed",
+  "osmnx_version": "2.0.7",
+  "speed_defaults_kmh": {
+    "motorway": 70,
+    "trunk": 60,
+    "primary": 50,
+    "secondary": 40,
+    "tertiary": 35,
+    "residential": 25,
+    "living_street": 15,
+    "service": 15,
+    "unclassified": 25
+  },
+  "attribution": "\u00a9 OpenStreetMap contributors; ODbL 1.0",
+  "source": "https://www.openstreetmap.org/copyright"
+}

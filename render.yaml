@@ -3,10 +3,9 @@ services:
     name: courier-api
     runtime: python
     plan: free
-    # `data/osm` is intentionally excluded from Git because the generated
-    # graph exceeds GitHub's regular file-size limit. Create it at build time,
-    # never as part of a request during the demo.
-    buildCommand: pip install -r requirements.txt && python -m scripts.build_osm_graph && python -m scripts.compact_osm_graph
+    # A 12 MB compressed OSM snapshot is versioned with the demo. This avoids
+    # depending on the public Overpass API whenever Render rebuilds.
+    buildCommand: pip install -r requirements.txt && gzip --decompress --keep data/osm/monterrey_drive.graphml.gz && python -m scripts.compact_osm_graph
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /healthz
     envVars:

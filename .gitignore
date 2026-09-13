@@ -6,7 +6,10 @@ artifacts/
 evaluation/*_results/
 data/raw/
 data/processed/
-data/osm/
+data/osm/*
+!data/osm/metadata.json
+!data/osm/zone_nodes.json
+!data/osm/monterrey_drive.graphml.gz
 frontend/node_modules/
 frontend/dist/
 frontend/test-results/
