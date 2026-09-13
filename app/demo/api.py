@@ -15,7 +15,7 @@ class Start(BaseModel):
 
 class Control(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    action: Literal["start", "pause", "reset", "speed"]
+    action: Literal["start", "pause", "reset", "speed", "complete"]
     speed: Literal[1, 5, 10, 25] = 25
 
 

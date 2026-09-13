@@ -82,6 +82,8 @@ def test_clock_pause_speed_completion_and_reset(service):
         s.offset=14400
         assert s.state()['status']=='completed'
         assert s.state()['metrics']['smart']['net_earnings_mxn']==100
+        service.control(s.id, 'reset')
+        assert service.control(s.id, 'complete').state()['status']=='completed'
         service.control(s.id,'reset')
         assert s.state()['orders']==[]
         await service.close()

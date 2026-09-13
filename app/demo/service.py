@@ -120,6 +120,9 @@ class DemoService:
             # Rewind the exact same source and injection schedule, without recalculation.
             session.offset, session.status = 0., "paused"
             session.rewound = True
+        elif action == "complete":
+            length = (datetime.fromisoformat(session.data["end_time"]) - datetime.fromisoformat(session.data["start_time"])).total_seconds()
+            session.offset, session.status, session.rewound = length, "completed", False
         elif action == "start" and session.status != "completed":
             session.status = "running"
             session.rewound = False

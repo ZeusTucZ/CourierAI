@@ -59,7 +59,7 @@ describe('Demo presentation uses recorded values', () => {
     render(<AgentPanel agent="smart" state={batching} revision={0} evaluating={false}/>)
     expect(screen.getByLabelText('2 órdenes activas')).toHaveTextContent('ORD-A')
     expect(screen.getByLabelText('2 órdenes activas')).toHaveTextContent('ORD-B')
-    expect(screen.getByText('En camino a entregar')).toBeInTheDocument()
+    expect(screen.getByText('Camino al domicilio')).toBeInTheDocument()
   })
   it('opens an independent order history for each model', () => {
     const acceptedOrder = { ...order, order_id: 'ORD-ACCEPTED', decisions: { ...order.decisions, smart: { ...decision, order_id: 'ORD-ACCEPTED', decision: 'ACCEPT' as const } } }
@@ -103,6 +103,8 @@ describe('Demo presentation uses recorded values', () => {
     expect(screen.getByText('$527.10')).toBeInTheDocument()
     fireEvent.click(screen.getByText('Ⅱ Pause'))
     expect(control).toHaveBeenCalledWith('pause')
+    fireEvent.click(screen.getByText('⏩ Simulate shift'))
+    expect(control).toHaveBeenCalledWith('complete')
   })
   it('allows selecting the shift duration before starting', () => {
     const setShiftHours = vi.fn()

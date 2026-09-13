@@ -55,8 +55,11 @@ def run_demo(seed, injections, source=None, shift_hours=4):
             active_orders = []
             for active in state.in_flight_orders:
                 next_step = next((step for step in self.route if step.order_id == active.offer.order_id), None)
+                phase = ("delivering" if fields.get("action") == "dropoff_arrival" and
+                         fields.get("order_id") == active.offer.order_id else
+                         next_step.phase.kind if next_step else "pending")
                 active_orders.append({"order_id": active.offer.order_id,
-                    "phase": next_step.phase.kind if next_step else "pending",
+                    "phase": phase,
                     "pickup": point(self.planner.graph, _store.node(active.offer.zone_pickup)),
                     "dropoff": point(self.planner.graph, _store.node(active.offer.zone_dropoff)),
                     "is_current": active.offer.order_id == active_id})
