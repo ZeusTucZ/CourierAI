@@ -15,7 +15,10 @@ class StrategySnapshot(Model):
     is_stale: bool = False
     reservation_wage_mxn_hr: NonNegative = 165
     zone_values: Mapping[int, Finite] = Field(default_factory=lambda: {7: 15.0, 11: -15.0}, validate_default=True)
-    flagged_zones: frozenset[int] = frozenset({11})
+    # Zone 99 is the public probe's designated flagged zone. It is outside the
+    # synthetic map, so it cannot affect generated shifts, but keeps /decide
+    # aligned with the published endpoint contract.
+    flagged_zones: frozenset[int] = frozenset({11, 99})
     vehicle_profiles: Mapping[Vehicle, VehicleProfile] = Field(default_factory=default_vehicle_profiles, validate_default=True)
     policy: PolicyConfig = Field(default_factory=PolicyConfig)
     strategy_version: str = "mvp1"

@@ -67,8 +67,11 @@ export default function App() {
       speechUrl.current = url
       speechAudio.current = audio
       audio.onended = () => { if (speechAudio.current === audio) stopSpeech() }
-      void audio.play().catch(() => { if (speechAudio.current === audio) stopSpeech() })
-    }).catch(() => {})
+      void audio.play().catch(() => {
+        if (speechAudio.current === audio) stopSpeech()
+        setError('Browser blocked route-event audio. Click Start, then allow sound for this tab.')
+      })
+    }).catch(() => setError('Route-event voice is unavailable. Check the backend and ElevenLabs configuration.'))
   }, [state?.id, state?.shocks, state?.status, speechEnabled])
   useEffect(() => {
     if (!state?.id || !speechEnabled || silentFastForward.current || state.status === 'completed') return
@@ -86,8 +89,11 @@ export default function App() {
       speechUrl.current = url
       speechAudio.current = audio
       audio.onended = () => { if (speechAudio.current === audio) stopSpeech() }
-      void audio.play().catch(() => { if (speechAudio.current === audio) stopSpeech() })
-    }).catch(() => {})
+      void audio.play().catch(() => {
+        if (speechAudio.current === audio) stopSpeech()
+        setError('Browser blocked order audio. Click Start, then allow sound for this tab.')
+      })
+    }).catch(() => setError('Order voice is unavailable. Check the backend and ElevenLabs configuration.'))
   }, [state?.id, state?.orders, state?.status, speechEnabled])
   useEffect(() => {
     const identifier = localStorage.getItem('courier-demo-session')

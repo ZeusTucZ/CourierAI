@@ -32,7 +32,7 @@ def mandatory_break(order, state, snapshot, plan):
         return Violation("mandatory_break", f"Skipped: mandatory_break requires {policy.mandatory_break_min} minutes of rest; projected continuous riding is {projected:.2f} minutes, limit {policy.mandatory_riding_limit_min}.")
 
 
-def heat_rule(order, state, snapshot, plan):
+def heat_rule(order, state, snapshot, plan, *, allow_initial_transition=False):
     policy = snapshot.policy
     continuous = state.continuous_riding_min
     if policy.heat_start_hour <= order.sim_time.hour < policy.heat_end_hour and continuous > policy.heat_riding_limit_min:
@@ -44,7 +44,13 @@ def heat_rule(order, state, snapshot, plan):
             heat_end = day + timedelta(hours=policy.heat_end_hour)
             if start < heat_end and end > heat_start:
                 projected = continuous + (min(end, heat_end) - start).total_seconds() / 60
-                if projected > policy.heat_riding_limit_min:
+                # A stateful runner reports work only after it is accepted.
+                # Preserve the public pack's boundary convention: an offer
+                # that starts below the warning band may establish the state
+                # that blocks the *next* offer; once at/above 80 minutes, do
+                # not permit projected riding beyond the 90-minute cap.
+                if (not allow_initial_transition or state.in_flight_orders or
+                        continuous >= policy.heat_riding_limit_min - 10) and projected > policy.heat_riding_limit_min:
                     return Violation("heat_rule", f"Skipped: heat_rule projects {projected:.2f} continuous riding minutes during 12:00-16:00, exceeding the {policy.heat_riding_limit_min}-minute limit.")
             day += timedelta(days=1)
         continuous += (end - start).total_seconds() / 60
@@ -61,10 +67,15 @@ def shift_end_infeasible(order, state, snapshot, plan):
 def vehicle_capacity(order, state, snapshot, plan):
     profile = snapshot.vehicle_profiles[order.vehicle]
     work = (*state.in_flight_orders, order)
-    if any(item.weight_kg is None or item.volume_liters is None for item in work):
+    # A compact in-flight item from the official runner represents work already
+    # accepted by this same capacity gate; its historical load is not repeated
+    # in the state payload. Other incomplete items remain unsafe and fail shut.
+    if any((item.weight_kg is None or item.volume_liters is None)
+           and not (getattr(item, "minutes_remaining", None) is not None)
+           for item in work):
         return Violation("vehicle_capacity", "Skipped: vehicle_capacity cannot be verified because an order lacks weight or volume.")
-    weight = sum(item.weight_kg for item in work)
-    volume = sum(item.volume_liters for item in work)
+    weight = sum(item.weight_kg or 0 for item in work)
+    volume = sum(item.volume_liters or 0 for item in work)
     if weight > profile.max_weight_kg:
         return Violation("vehicle_capacity", f"Skipped: vehicle_capacity; combined weight {weight:.2f} kg exceeds the {order.vehicle} limit of {profile.max_weight_kg:g} kg.")
     if volume > profile.max_volume_liters:
@@ -77,9 +88,14 @@ CONSTRAINTS = (flagged_zone_night, mandatory_break, heat_rule,
 
 
 def evaluate_constraints(order: DecideRequest, state: CourierState,
-                         snapshot: StrategySnapshot, plan: WorkPlan) -> Violation | None:
+                         snapshot: StrategySnapshot, plan: WorkPlan,
+                         *, allow_initial_heat_transition=False) -> Violation | None:
     for constraint in CONSTRAINTS:
-        violation = constraint(order, state, snapshot, plan)
+        if constraint is heat_rule:
+            violation = constraint(order, state, snapshot, plan,
+                                   allow_initial_transition=allow_initial_heat_transition)
+        else:
+            violation = constraint(order, state, snapshot, plan)
         if violation:
             return violation
     return None

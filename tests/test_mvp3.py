@@ -203,12 +203,12 @@ def test_insertion_beats_fifo_and_preserves_pickup_capacity_sla():
         pickup = next(i for i, e in enumerate(positions) if e.get("order_id") == ident and e.get("action") == "pickup_arrival")
         delivery = next(i for i, e in enumerate(positions) if e.get("order_id") == ident and e.get("action") == "dropoff_arrival")
         assert pickup < delivery
-    assert all(e["current_weight_kg"] <= 15 and e["current_volume_liters"] <= 50 for e in positions)
+    assert all(e["current_weight_kg"] <= 20 and e["current_volume_liters"] <= 20 for e in positions)
 
 
 def test_batching_rejects_capacity_and_sla_and_has_bounded_latency():
     cfg = config()
-    result, _ = run3(cfg, offer(cfg, weight_kg=15), offer(cfg, at=1, order_id="B", weight_kg=1))
+    result, _ = run3(cfg, offer(cfg, weight_kg=19), offer(cfg, at=1, order_id="B", weight_kg=2))
     assert selected(result, "decision")[1]["binding_constraint"] == "vehicle_capacity"
     assert max(e["latency_ms"] for e in selected(result, "decision")) < 50
     with pytest.raises(ValidationError):

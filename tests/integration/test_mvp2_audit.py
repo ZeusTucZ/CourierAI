@@ -99,7 +99,7 @@ def test_batching_accepts_when_capacity_and_time_allow():
 
 
 @pytest.mark.parametrize("constraint,first,second", [
-    ("vehicle_capacity", {"weight_kg": 12}, {"weight_kg": 4}),
+    ("vehicle_capacity", {"weight_kg": 18}, {"weight_kg": 4}),
     ("shift_end_infeasible", {}, {"estimated_delivery_min": 60}),
 ])
 def test_second_order_safety_uses_pending_work(constraint, first, second):

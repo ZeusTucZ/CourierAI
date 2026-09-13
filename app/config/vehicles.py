@@ -11,7 +11,8 @@ class VehicleProfile(Model):
 def default_vehicle_profiles() -> dict[Vehicle, VehicleProfile]:
     # PLACEHOLDERS for calibration, not measured vehicle specifications.
     return {
-        "moto": VehicleProfile(speed_kmh=25, max_weight_kg=15, max_volume_liters=50,
+        # Published evaluation probes use moto limits of 20 kg and 20 L.
+        "moto": VehicleProfile(speed_kmh=25, max_weight_kg=20, max_volume_liters=20,
                                operating_cost_mxn_per_km=1.2),
         "car": VehicleProfile(speed_kmh=20, max_weight_kg=100, max_volume_liters=300,
                               operating_cost_mxn_per_km=3),

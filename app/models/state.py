@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 
 from app.models.common import Model, NonNegative
 
@@ -20,7 +20,14 @@ class InFlightOrder(Model):
     estimated_pickup_min: NonNegative | None = None
     estimated_delivery_min: NonNegative | None = None
     restaurant_prep_min: NonNegative = 0
-    zone_dropoff: int | None = Field(default=None, strict=True)
+    zone_dropoff: int | None = Field(
+        default=None, strict=True,
+        validation_alias=AliasChoices("zone_dropoff", "dropoff_zone"),
+    )
+    # The public probe runner carries accepted work forward using this compact
+    # representation. When supplied it is the complete remaining service time,
+    # rather than a pickup/delivery estimate.
+    minutes_remaining: NonNegative | None = Field(default=None, exclude=True)
 
 
 class CourierStateOverrides(Model):

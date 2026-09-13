@@ -41,6 +41,17 @@ def build_work_plan(order: DecideRequest, state: CourierState,
     unknown = False
     work: tuple[InFlightOrder | DecideRequest, ...] = (*state.in_flight_orders, order)
     for item in work:
+        if isinstance(item, InFlightOrder) and item.minutes_remaining is not None:
+            service = max(item.minutes_remaining, snapshot.policy.minimum_service_time_min)
+            end = cursor + timedelta(minutes=service)
+            # The runner only supplies a remaining duration, not the phase
+            # split. Conservatively treat it as riding for time safeguards.
+            intervals.append((cursor, end))
+            riding += service
+            cursor = end
+            total += service
+            dropoffs.append((item.zone_dropoff, cursor))
+            continue
         pickup = leg_minutes(item.estimated_pickup_min, item.distance_pickup_km, profile)
         delivery = leg_minutes(item.estimated_delivery_min, item.distance_delivery_km, profile)
         if pickup is None or delivery is None:

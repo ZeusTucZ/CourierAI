@@ -24,7 +24,8 @@ async def prewarm_advisory(order: DecideRequest, request: Request):
 async def decide(order: DecideRequest, request: Request):
     try:
         service = request.app.state.decisions
-        response = service.decide(order, request.state.started_ns)
+        response = service.decide(order, request.state.started_ns,
+                                  allow_initial_heat_transition=True)
         if service.advisor and service.advisor.config.enabled and service.advisor.config.api_key:
             async def explain_later():
                 from app.llm.explanation_service import GeminiExplanationService
@@ -48,3 +49,10 @@ async def explain_decision(order_id: str, request: Request):
     if record is None:
         raise HTTPException(404, "Decision not found")
     return record
+
+
+@router.get("/explain_decision/{order_id}", response_model=DecisionRecord,
+            include_in_schema=False)
+async def explain_decision_probe_compatibility(order_id: str, request: Request):
+    """Compatibility alias used by the supplied probe-pack runner."""
+    return await explain_decision(order_id, request)

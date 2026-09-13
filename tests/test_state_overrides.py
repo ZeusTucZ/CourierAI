@@ -44,13 +44,15 @@ def test_explicit_continuous_time_is_not_reset_by_old_break(evaluate):
         "continuous_riding_min": 240}}).binding_constraint == "mandatory_break"
 
 
-@pytest.mark.parametrize("item", [inflight(weight_kg=15), inflight(volume_liters=50)])
-def test_inflight_load(evaluate, item):
+@pytest.mark.parametrize("dimension", ["weight_kg", "volume_liters"])
+def test_inflight_load(evaluate, snapshot, dimension):
+    profile = snapshot.vehicle_profiles["moto"]
+    item = inflight(**{dimension: getattr(profile, f"max_{dimension}")})
     assert evaluate({"courier_state_overrides": {"in_flight_orders": [item]}}).binding_constraint == "vehicle_capacity"
 
 
 def test_multiple_inflight_orders_are_summed(evaluate):
-    result = evaluate({"courier_state_overrides": {"in_flight_orders": [inflight(weight_kg=8), inflight(weight_kg=8)]}})
+    result = evaluate({"courier_state_overrides": {"in_flight_orders": [inflight(weight_kg=11), inflight(weight_kg=11)]}})
     assert result.binding_constraint == "vehicle_capacity"
 
 
