@@ -1,9 +1,11 @@
 from time import perf_counter_ns
 from contextlib import asynccontextmanager
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.routes import router
@@ -28,6 +30,18 @@ def create_app(snapshot: StrategySnapshot | None = None, *, routing_service=None
         application.state.routing.close()
 
     application = FastAPI(title="Courier Fast Decision Engine", version="0.1.0", lifespan=lifespan)
+    # Comma-separated public frontend origins. Keep local Vite development
+    # working without opening the API to every website in production.
+    cors_origins = [origin.strip() for origin in os.getenv(
+        "CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+    ).split(",") if origin.strip()]
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     application.state.routing = routing_service or RoutingService(ROOT / "data/osm")
     application.state.demo = demo_service or DemoService()
     application.state.geospatial_runs = Path(geospatial_runs or ROOT / "artifacts/geospatial/runs")
@@ -58,6 +72,11 @@ def create_app(snapshot: StrategySnapshot | None = None, *, routing_service=None
     application.include_router(geographic_router)
     application.include_router(demo_router)
     application.include_router(speech_router)
+
+    @application.get("/healthz", include_in_schema=False)
+    async def healthcheck():
+        return {"status": "ok"}
+
     return application
 
 

@@ -16,12 +16,9 @@ def enabled() -> bool:
 
 
 def event_summary(shock: dict) -> str:
-    lines = [EVENT_NAMES[shock['shock_type']] + '.']
-    for agent in ('baseline', 'smart'):
-        label = 'Baseline' if agent == 'baseline' else 'Smart'
-        detours = shock['detours'][agent]
-        lines.append(f'{label} route updated.' if detours else f'{label} route unchanged.')
-    return ' '.join(lines)
+    smart_detours = shock['detours']['smart']
+    smart_update = 'Smart route updated.' if smart_detours else 'Smart route unchanged.'
+    return f"{EVENT_NAMES[shock['shock_type']]}. {smart_update}"
 
 
 @router.get('/status')

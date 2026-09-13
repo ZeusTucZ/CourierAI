@@ -1,11 +1,16 @@
 import type { SimulationState } from '../types'
 
+const apiBaseUrl = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')
+const socketBaseUrl = apiBaseUrl
+  ? apiBaseUrl.replace(/^http/, 'ws')
+  : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`
+
 export function connectSimulation(id: string, onState: (s: SimulationState) => void, onConnection: (connected: boolean) => void) {
   let disposed = false
   let retry: ReturnType<typeof setTimeout> | undefined
   let socket: WebSocket | undefined
   function connect() {
-    socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/demo/simulations/${id}/ws`)
+    socket = new WebSocket(`${socketBaseUrl}/demo/simulations/${id}/ws`)
     socket.onopen = () => onConnection(true)
     socket.onmessage = event => {
       try {

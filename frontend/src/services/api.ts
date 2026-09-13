@@ -1,7 +1,11 @@
 import type { AgentKey, Decision, SimulationState, ZoneCollection, Shock } from '../types'
 
+// Empty in local development, where Vite proxies requests to FastAPI. Set this
+// to the public API URL in Vercel (for example https://courier-api.onrender.com).
+const apiBaseUrl = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')
+
 async function request<T>(path: string, data?: object): Promise<T> {
-  const response = await fetch(path, data ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) } : undefined)
+  const response = await fetch(`${apiBaseUrl}${path}`, data ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) } : undefined)
   if (!response.ok) {
     const body: { detail?: unknown } = await response.json().catch(() => ({}))
     throw new Error(typeof body.detail === 'string' ? body.detail : `Request failed (${response.status})`)
@@ -18,7 +22,7 @@ export const api = {
   explanation: (id: string, order: string) => request<DecisionExplanationResult>(`/demo/simulations/${id}/decisions/${encodeURIComponent(order)}/explanation`),
   speechStatus: () => request<{ enabled: boolean }>('/demo/speech/status'),
   routeSpeech: async (id: string, eventId: string, signal: AbortSignal) => {
-    const response = await fetch(`/demo/speech/simulations/${encodeURIComponent(id)}/route-events/${encodeURIComponent(eventId)}`, { method: 'POST', signal })
+    const response = await fetch(`${apiBaseUrl}/demo/speech/simulations/${encodeURIComponent(id)}/route-events/${encodeURIComponent(eventId)}`, { method: 'POST', signal })
     if (!response.ok) throw new Error(`Speech unavailable (${response.status})`)
     return response.blob()
   },

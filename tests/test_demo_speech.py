@@ -38,6 +38,7 @@ def test_route_speech_is_optional_and_only_uses_visible_events(monkeypatch):
         assert result.headers['content-type'] == 'audio/mpeg'
         assert requests[0].headers['xi-api-key'] == 'test-key'
         assert 'Smart route updated.' in requests[0].content.decode()
+        assert 'Baseline' not in requests[0].content.decode()
 
         session.status = 'completed'
         assert client.post(path).status_code == 409
