@@ -5,10 +5,12 @@ from dataclasses import replace
 
 from app.agents.smart import SmartAgent
 from app.decision.constraints import evaluate_constraints
+from app.decision.timing import build_work_plan
 from app.models.state import resolve_state
 from app.simulation.strategic import StrategicSimulator
 from app.simulation.state import to_us, MINUTE_US
 from app.strategy.routing import insert_order, route_plan
+from app.strategy.routing import InsertionDiagnostics
 from app.geospatial.routing import NoRoute
 from app.geospatial.geometry import line, point
 from app.geospatial.cache import digest
@@ -145,6 +147,17 @@ class GeospatialSimulator(StrategicSimulator):
         if evaluate_constraints(request,state,self.agent.snapshot,plan):
             return None
         return sequence,plan
+
+    def _candidate_diagnostics(self, job, request):
+        candidate = self._candidate(job, request)
+        state = resolve_state(request.sim_time, request.courier_state_overrides,
+                              self.agent.snapshot.policy.default_shift_hours)
+        isolated_violation = evaluate_constraints(request, state, self.agent.snapshot,
+                                                  build_work_plan(request, state, self.agent.snapshot))
+        cause = (None if candidate else "active_commitment" if self.move else
+                 "hard_constraint" if isolated_violation else "sla_infeasible")
+        return InsertionDiagnostics(candidate, cause, 1, int(candidate is None and not self.move),
+                                    0, None)
 
     def _commit_candidate(self, sequence, job):
         super()._commit_candidate(sequence,job)

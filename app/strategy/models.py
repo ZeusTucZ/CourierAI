@@ -48,6 +48,13 @@ class StrategyPolicy(Model):
     cancellation_penalty_mxn: NonNegative = 20
     lateness_penalty_mxn_per_min: NonNegative = 1
     cancellation_min_gain: NonNegative = 5
+    # Smart v2 is a controlled strategic-policy experiment. These values are
+    # assumptions, not calibrated constraints, and never relax safety gates.
+    use_smart_v2_scoring: bool = True
+    commitment_free_window_min: NonNegative = 25
+    commitment_cost_per_min: NonNegative = 2
+    preferred_sla_buffer_min: NonNegative = 10
+    sla_risk_cost_per_min: NonNegative = 2
     use_zone_value: bool = True
     use_reposition: bool = True
     use_improved_batching: bool = True

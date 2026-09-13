@@ -32,3 +32,17 @@ class DecisionLog:
     def history(self, order_id: str) -> tuple[DecisionRecord, ...]:
         with self._lock:
             return tuple(deepcopy(self._records.get(order_id, ())))
+
+    def amend_latest(self, order_id: str, response, decision_details: dict) -> None:
+        """Attach simulator-only route evidence after the fast-path decision."""
+        with self._lock:
+            records = self._records.get(order_id)
+            if not records:
+                return
+            records[-1] = records[-1].model_copy(update={
+                "decision": response.decision,
+                "binding_constraint": response.binding_constraint,
+                "reason": response.reason,
+                "economics": response.economics,
+                "decision_details": deepcopy(decision_details),
+            })

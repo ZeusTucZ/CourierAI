@@ -64,8 +64,12 @@ class DecisionRecord(DecideResponse):
     inputs: dict[str, Any]
     strategy_snapshot: dict[str, Any]
     alternatives_considered: tuple[Alternative, ...]
+    decision_details: dict[str, Any] | None = None
 
     @model_serializer(mode="wrap")
     def serialize_record(self, handler):
         # Audit records explicitly retain economics=null for hard refusals.
-        return handler(self)
+        data = handler(self)
+        if data.get("decision_details") is None:
+            data.pop("decision_details", None)
+        return data

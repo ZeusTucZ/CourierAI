@@ -26,7 +26,19 @@ def load_frozen(path):
         raise ValueError('Frozen configuration hash mismatch')
     profile=SimulationProfile.model_validate(payload['profile'])
     model=HistoricalDemandModel.model_validate(payload['model'])
-    policy=StrategyPolicy.model_validate(payload['parameters'])
-    if fingerprint(profile,model,policy)!=payload['experiment_sha256']:
+    # Verify the exact serialized parameters that were originally frozen. New
+    # optional policy fields must not invalidate or silently promote an older
+    # held-out artifact merely because model validation supplies new defaults.
+    original = payload['parameters']
+    frozen_fingerprint = sha256(json.dumps([
+        profile.model_dump(mode='json'), model.model_dump(mode='json'), original
+    ], sort_keys=True).encode()).hexdigest()
+    if frozen_fingerprint!=payload['experiment_sha256']:
         raise ValueError('Frozen experiment fingerprint mismatch')
+    policy=StrategyPolicy.model_validate({
+        **original,
+        # Historical artifacts remain on Current Smart until explicitly frozen
+        # with a Smart-v2 choice after diagnostic review.
+        'use_smart_v2_scoring': original.get('use_smart_v2_scoring', False),
+    })
     return profile,model,policy

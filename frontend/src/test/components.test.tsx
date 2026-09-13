@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { AgentPanel } from '../components/AgentPanel'
 import { OrdersFeed, OrderDecisionCard, ShockCard } from '../components/OrdersFeed'
 import { Header } from '../components/Header'
@@ -44,6 +44,31 @@ describe('Demo presentation uses recorded values', () => {
     expect(screen.getByText('$438.20')).toBeInTheDocument()
     view.rerender(<AgentPanel agent="smart" state={{ ...agent, net_earnings: 527.1 }} revision={0} evaluating={false}/>)
     expect(screen.getByText('$527.10')).toBeInTheDocument()
+  })
+  it('shows the active order over each courier map', () => {
+    render(<><AgentPanel agent="baseline" state={{ ...agent, current_order: 'ORD-ACTIVE-1' }} revision={0} evaluating={false}/><AgentPanel agent="smart" state={{ ...agent, current_order: 'ORD-ACTIVE-2' }} revision={0} evaluating={false}/></>)
+    expect(screen.getAllByText('Orden actual:')).toHaveLength(2)
+    expect(screen.getByText('ORD-ACTIVE-1')).toBeInTheDocument()
+    expect(screen.getByText('ORD-ACTIVE-2')).toBeInTheDocument()
+  })
+  it('opens an independent order history for each model', () => {
+    const acceptedOrder = { ...order, order_id: 'ORD-ACCEPTED', decisions: { ...order.decisions, smart: { ...decision, order_id: 'ORD-ACCEPTED', decision: 'ACCEPT' as const } } }
+    render(<AgentPanel agent="smart" state={agent} order={order} orders={[order, acceptedOrder]} zones={zones} revision={0} evaluating={false}/>)
+    fireEvent.click(screen.getByRole('button', { name: /Ver historial/ }))
+    const dialog = screen.getByRole('dialog')
+    const history = within(dialog)
+    expect(dialog).toHaveAccessibleName('Courier AI')
+    expect(screen.getByLabelText('2 pedidos recibidos')).toBeInTheDocument()
+    expect(screen.getByLabelText('1 pedidos aceptados')).toBeInTheDocument()
+    expect(screen.getByLabelText('1 pedidos omitidos')).toBeInTheDocument()
+    fireEvent.click(history.getByRole('button', { name: /Aceptados/ }))
+    expect(history.getByText('ORD-ACCEPTED')).toBeInTheDocument()
+    expect(history.queryByText('ORD-001')).not.toBeInTheDocument()
+    fireEvent.click(history.getByRole('button', { name: /Omitidos/ }))
+    expect(history.getByText('ORD-001')).toBeInTheDocument()
+    expect(history.queryByText('ORD-ACCEPTED')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar historial' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
   it('shows actual closure detour', () => {
     render(<ShockCard shock={shock}/>)

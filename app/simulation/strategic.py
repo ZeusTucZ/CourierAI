@@ -16,6 +16,7 @@ from app.simulation.state import ActiveOrder, MINUTE_US, Phase, to_us
 from app.strategy.cancellation import CancellationPolicy
 from app.strategy.reposition import choose_reposition, zone_distance
 from app.strategy.routing import insert_order, route_plan, steps_for
+from app.strategy.routing import inspect_insert_order
 from app.strategy.sla import compute_delivery_deadline
 from app.strategy.updater import StrategyUpdater
 
@@ -167,6 +168,15 @@ class StrategicSimulator(Simulator):
         _, completion = route_plan(self.route, self.state.current_sim_time)
         for job in self.state.in_flight_orders:
             job.estimated_completion_time = completion[job.offer.order_id]
+        if isinstance(self.agent, SmartAgent) and self.policy.use_smart_v2_scoring and self.route:
+            margins = {job.offer.order_id:
+                (job.promised_completion_time - completion[job.offer.order_id]).total_seconds() / 60
+                for job in self.state.in_flight_orders}
+            self._trace("route_metrics_updated",
+                commitment_horizon_min=sum(step.phase.remaining_us for step in self.route) / MINUTE_US,
+                route_eta={key: value.isoformat() for key, value in completion.items()},
+                sla_margins_min=margins,
+                minimum_sla_margin_min=min(margins.values()))
         violation = self._remaining_violation()
         previous = self.state.execution_hold
         self.state.execution_hold = violation.constraint if violation else None
@@ -225,6 +235,56 @@ class StrategicSimulator(Simulator):
         return insert_order(self.route, job, self.state.in_flight_orders, request, self.agent.snapshot,
             self.policy, improved=isinstance(self.agent, SmartAgent) and self.policy.use_improved_batching) if not self.move else None
 
+    def _candidate_diagnostics(self, job, request):
+        if self.move:
+            from app.strategy.routing import InsertionDiagnostics
+            return InsertionDiagnostics(None, "active_commitment", 0, 0, 0, None)
+        return inspect_insert_order(self.route, job, self.state.in_flight_orders, request,
+            self.agent.snapshot, self.policy,
+            improved=isinstance(self.agent, SmartAgent) and self.policy.use_improved_batching)
+
+    @staticmethod
+    def _route_distance(sequence):
+        return sum(step.phase.distance_km for step in sequence)
+
+    def _smart_v2_details(self, order, candidate, deadline):
+        sequence, candidate_plan = candidate
+        now = self.state.current_sim_time
+        current_plan, _ = route_plan(self.route, now)
+        _, completion = route_plan(sequence, now, order.order_id)
+        deadlines = {job.offer.order_id: job.promised_completion_time
+                     for job in self.state.in_flight_orders}
+        deadlines[order.order_id] = deadline
+        margins = {key: (deadlines[key] - arrival).total_seconds() / 60
+                   for key, arrival in completion.items()}
+        current_distance = self._route_distance(self.route)
+        candidate_distance = self._route_distance(sequence)
+        minimum_margin = min(margins.values())
+        details = self.agent.score_route_candidate(order,
+            current_plan=current_plan, candidate_plan=candidate_plan,
+            current_distance_km=current_distance, candidate_distance_km=candidate_distance,
+            minimum_sla_margin_min=minimum_margin, policy=self.policy)
+        details["sla_margins_min"] = margins
+        return details
+
+    @staticmethod
+    def _smart_v2_reason(details, accepted):
+        if details["mode"] == "idle":
+            horizon = details["commitment_horizon_min"]
+            if accepted:
+                qualifier = "strong net value" if details["final_score_mxn"] >= 20 else "positive net value"
+                return f"Accepted: {horizon:.1f} min idle commitment has {qualifier} after commitment risk."
+            return (f"Skipped: {horizon:.1f} min idle commitment loses value after a "
+                    f"MXN {details['commitment_penalty_mxn']:.1f} commitment penalty.")
+        if accepted:
+            return (f"Accepted: batch adds {details['incremental_time_min']:.1f} min and "
+                    f"{details['incremental_distance_km']:.1f} km while preserving SLA margin.")
+        if details["decision_cause"] == "sla_risk":
+            return (f"Skipped: batch leaves only {details['minimum_sla_margin_min']:.1f} min SLA margin "
+                    "and insufficient risk-adjusted value.")
+        return (f"Skipped: batch adds {details['incremental_time_min']:.1f} min for insufficient "
+                "incremental net value.")
+
     def _commit_candidate(self, sequence, job):
         self.route = sequence
         self.state.in_flight_orders.append(job)
@@ -235,22 +295,52 @@ class StrategicSimulator(Simulator):
         self._emit("order_offered", **order.model_dump(mode="json", exclude={"event", "sim_time", "courier_state_overrides"}, exclude_none=True), source_event=source)
         deadline = compute_delivery_deadline(order, self.state, self.policy)
         job = ActiveOrder.accepted(order, self.agent.snapshot, deadline)
-        candidate = self._candidate(job, request)
+        insertion = self._candidate_diagnostics(job, request)
+        candidate = insertion.candidate
         started = perf_counter_ns()
         if candidate:
             sequence, plan = candidate
             response = self.agent.service.decide(request, plan=plan) if isinstance(self.agent, SmartAgent) else self.agent.decide_request(request)
         else:
             response = self.agent.decide_request(request)
-            if response.decision == "ACCEPT":
-                response = response.model_copy(update={"decision": "SKIP", "binding_constraint": "reservation_wage",
-                    "reason": "Skipped: configured SLA or active-commitment limit prevents a feasible insertion; repositioning also reserves availability."})
+            cause = insertion.decision_cause or "hard_constraint"
+            if response.decision == "ACCEPT" or cause in {"sla_infeasible", "active_commitment"}:
+                reason = ({
+                    "sla_infeasible": "Skipped: no insertion preserves every active and candidate SLA deadline.",
+                    "capacity": "Skipped: active-order capacity leaves no feasible insertion.",
+                    "active_commitment": "Skipped: active repositioning prevents a feasible route insertion.",
+                }.get(cause, "Skipped: no insertion satisfies the active hard constraints."))
+                response = response.model_copy(update={"decision": "SKIP", "binding_constraint": None,
+                    "reason": reason})
+        details = None
+        if isinstance(self.agent, SmartAgent) and self.policy.use_smart_v2_scoring:
+            if candidate:
+                details = self._smart_v2_details(request, candidate, deadline)
+                accepted = details["final_score_mxn"] >= 0
+                details["decision"] = "ACCEPT" if accepted else "SKIP"
+                response = response.model_copy(update={
+                    "decision": details["decision"],
+                    "binding_constraint": None,
+                    "reason": self._smart_v2_reason(details, accepted),
+                })
+            else:
+                details = {
+                    "mode": "batching" if self.state.in_flight_orders else "idle",
+                    "decision_cause": insertion.decision_cause,
+                    "minimum_sla_margin_min": insertion.best_rejected_sla_margin_min,
+                    "candidates_considered": insertion.candidates_considered,
+                    "deadline_rejections": insertion.deadline_rejections,
+                    "constraint_rejections": insertion.constraint_rejections,
+                    "decision": "SKIP",
+                }
+            self.agent.service.log.amend_latest(order.order_id, response, details)
         self.state.orders_offered += 1
         response = response.model_copy(update={"latency_ms": (perf_counter_ns() - started) / 1e6})
         self._emit("decision", **response.model_dump(mode="json"), decision_request=request.model_dump(mode="json"),
                    courier_state=self.state.summary(), strategy_snapshot=self.agent.snapshot.model_dump(mode="json"),
                    delivery_deadline=deadline.isoformat(), insertion_feasible=candidate is not None,
-                   planned_route=[[step.order_id, step.phase.kind] for step in candidate[0]] if candidate else [])
+                   planned_route=[[step.order_id, step.phase.kind] for step in candidate[0]] if candidate else [],
+                   **({"smart_v2": details} if details is not None else {}))
         if response.decision == "ACCEPT":
             self._commit_candidate(candidate[0], job)
             self.state.orders_accepted += 1
