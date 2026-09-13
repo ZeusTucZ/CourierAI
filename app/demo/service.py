@@ -10,8 +10,8 @@ from app.demo.runner import run_demo
 
 
 class DemoSession:
-    def __init__(self, seed, shift_hours=4):
-        self.id, self.seed, self.shift_hours = uuid4().hex, seed, shift_hours
+    def __init__(self, seed, shift_hours=4, vehicle="moto"):
+        self.id, self.seed, self.shift_hours, self.vehicle = uuid4().hex, seed, shift_hours, vehicle
         self.data = None
         self.status, self.error = "preparing", None
         self.speed, self.offset, self.anchor = 25, 0., monotonic()
@@ -40,7 +40,7 @@ class DemoSession:
     def state(self):
         elapsed = self.seconds()
         self.last_access = monotonic()
-        base = {"id": self.id, "seed": self.seed, "shift_hours": self.shift_hours, "status": self.status, "speed": self.speed,
+        base = {"id": self.id, "seed": self.seed, "shift_hours": self.shift_hours, "vehicle": self.vehicle, "status": self.status, "speed": self.speed,
                 "error": self.error, "revision": self.version}
         if not self.data:
             return {**base, "agents": {}, "orders": [], "shocks": [], "same_stream": False}
@@ -85,12 +85,12 @@ class DemoService:
         self.sessions, self.runner = {}, runner
         self.executor = ProcessPoolExecutor(max_workers=1) if runner is run_demo else None
 
-    async def compute(self, seed, injections, source=None, shift_hours=4):
+    async def compute(self, seed, injections, source=None, shift_hours=4, vehicle="moto"):
         if self.executor:
-            return await asyncio.get_running_loop().run_in_executor(self.executor, self.runner, seed, injections, source, shift_hours)
-        return self.runner(seed, injections, source)
+            return await asyncio.get_running_loop().run_in_executor(self.executor, self.runner, seed, injections, source, shift_hours, vehicle)
+        return self.runner(seed, injections, source, shift_hours, vehicle)
 
-    def create(self, seed, shift_hours=4):
+    def create(self, seed, shift_hours=4, vehicle="moto"):
         for key, session in list(self.sessions.items()):
             if (monotonic() - session.last_access > 3600 and session.subscribers == 0
                     and not (session.task and not session.task.done())):
@@ -102,14 +102,14 @@ class DemoService:
                 raise ValueError("Eight demo sessions are currently active; close an older demo tab before starting another")
             oldest = min(candidates, key=lambda session: session.last_access)
             del self.sessions[oldest.id]
-        session = DemoSession(seed, shift_hours)
+        session = DemoSession(seed, shift_hours, vehicle)
         self.sessions[session.id] = session
         session.task = asyncio.create_task(self.prepare(session))
         return session
 
     async def prepare(self, session):
         try:
-            session.data = await self.compute(session.seed, [], shift_hours=session.shift_hours)
+            session.data = await self.compute(session.seed, [], shift_hours=session.shift_hours, vehicle=session.vehicle)
             session.status, session.anchor = "running", monotonic()
         except Exception as exc:
             session.status, session.error = "error", str(exc)
@@ -177,7 +177,7 @@ class DemoService:
 
         async def rebuild():
             try:
-                revised = await self.compute(session.seed, session.injections + [event], session.data["source"], session.shift_hours)
+                revised = await self.compute(session.seed, session.injections + [event], session.data["source"], session.shift_hours, session.vehicle)
                 # The past must not change when branching at the presentation cursor.
                 from app.simulation.replay import logical
                 for key in ("baseline", "smart"):

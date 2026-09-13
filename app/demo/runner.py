@@ -10,7 +10,7 @@ _store = None
 _inputs = None
 
 
-def run_demo(seed, injections, source=None, shift_hours=4):
+def run_demo(seed, injections, source=None, shift_hours=4, vehicle="moto"):
     global _store, _inputs
     from app.agents.nearby import FirstNearbyBaselineConfig, FirstNearbyOrderBaseline
     from app.agents.smart import SmartAgent
@@ -32,7 +32,7 @@ def run_demo(seed, injections, source=None, shift_hours=4):
         _inputs = (*load_frozen(path), "Frozen MVP 3 configuration") if path.exists() else (
             None, HistoricalDemandModel(), StrategyPolicy(), "Geographic demo · existing defaults · frozen artifact unavailable")
     profile, model, policy, provenance = _inputs
-    cfg = ShiftConfig(seed=seed, shift_hours=shift_hours, vehicle="moto", start_location_zone=7, profile=profile)
+    cfg = ShiftConfig(seed=seed, shift_hours=shift_hours, vehicle=vehicle, start_location_zone=7, profile=profile)
     original = source if source is not None else generate_shift(cfg)
     events = deepcopy(original) + deepcopy(injections)
     priority = {"shift_start": 0, "shock": 1, "order_offered": 2, "shift_end": 3}
@@ -104,7 +104,7 @@ def run_demo(seed, injections, source=None, shift_hours=4):
         agents[key] = {"frames": simulator.frames, "decisions": decisions, "offers": offers,
             "detours": detours, "metrics": result.metrics.to_dict()}
     assert len(set(streams)) == 1, "Agents must consume the identical source stream"
-    return {"seed": seed, "shift_hours": shift_hours, "source": original, "stream_hash": streams[0], "same_stream": True,
+    return {"seed": seed, "shift_hours": shift_hours, "vehicle": vehicle, "source": original, "stream_hash": streams[0], "same_stream": True,
         "start_time": events[0]["sim_time"], "end_time": events[-1]["sim_time"], "provenance": provenance,
         "orders": [e for e in original if e["event"] == "order_offered"],
         "shocks": [e for e in events if e["event"] == "shock"], "agents": agents,

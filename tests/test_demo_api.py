@@ -9,7 +9,7 @@ from app.demo.service import DemoService, DemoSession
 from app.main import create_app
 
 
-def timeline(seed, injections, source=None):
+def timeline(seed, injections, source=None, shift_hours=4, vehicle="moto"):
     start = '2026-03-21T18:00:00'
     decision = {"event": "decision", "order_id": "ONE", "sim_time": start, "decision": "ACCEPT", "reason": "Recorded fixture reason.", "latency_ms": 1}
     frame = {"sim_time": start, "version": 0, "position": [-100.289,25.651], "zone": 7, "net_earnings": 100,
@@ -18,7 +18,7 @@ def timeline(seed, injections, source=None):
                                 "dropoff": [-100.3,25.66], "is_current": True}],
              "closures": {"type":"FeatureCollection","features":[]}}
     data = {"frames": [frame], "decisions": {"ONE":decision}, "offers": {"ONE":{}}, "detours": [], "metrics": {"net_earnings_mxn":100}}
-    return {"seed":seed,"source":source or [{"event":"order_offered","order_id":"ONE","sim_time":start}],
+    return {"seed":seed,"shift_hours":shift_hours,"vehicle":vehicle,"source":source or [{"event":"order_offered","order_id":"ONE","sim_time":start}],
             "start_time":start,"end_time":"2026-03-21T22:00:00","same_stream":True,"provenance":"test fixture",
             "start_position":[-100.289,25.651],"baseline_threshold":15,
             "orders":[{"order_id":"ONE","sim_time":start,"zone_pickup":7,"zone_dropoff":11}],
@@ -40,9 +40,10 @@ def test_live_api_start_socket_decision_pause_reset(service):
             if state['status']=='preparing':
                 state=socket.receive_json()['state']
             assert state['same_stream'] is True
-            assert state['shift_hours'] == 2
-            assert state['orders'][0]['order_id']=='ONE'
-            assert state['agents']['smart']['active_orders'][0]['order_id']=='ONE'
+        assert state['shift_hours'] == 2
+        assert state['vehicle'] == 'moto'
+        assert state['orders'][0]['order_id']=='ONE'
+        assert state['agents']['smart']['active_orders'][0]['order_id']=='ONE'
         details=client.get(f'/demo/simulations/{identifier}/decisions/ONE').json()
         assert details['smart']['reason']=='Recorded fixture reason.'
         assert client.post(f'/demo/simulations/{identifier}/control',json={"action":"pause"}).json()['status']=='paused'
@@ -50,6 +51,18 @@ def test_live_api_start_socket_decision_pause_reset(service):
         assert reset['orders']==[] and reset['agents']['smart']['net_earnings']==0
         assert client.get(f'/demo/simulations/{identifier}/decisions/ONE').status_code==404
         assert client.post(f'/demo/simulations/{identifier}/control',json={"action":"start"}).json()['orders']
+
+
+def test_demo_vehicle_reaches_runner_and_state(service):
+    with TestClient(create_app(demo_service=service)) as client:
+        response = client.post('/demo/simulations', json={"seed": 42, "vehicle": "bike"})
+        assert response.status_code == 202
+        identifier = response.json()['id']
+        with client.websocket_connect(f'/demo/simulations/{identifier}/ws') as socket:
+            state = socket.receive_json()['state']
+            if state['status'] == 'preparing':
+                state = socket.receive_json()['state']
+        assert state['vehicle'] == 'bike'
 
 
 @pytest.mark.parametrize('kind',['rain','surge','closure','delay'])
@@ -136,8 +149,8 @@ def test_demo_explanation_is_grounded_cached_and_keeps_decision():
         async def explain(self, payload):
             calls.append(json.loads(payload))
             return 'This order was skipped because completion would exceed the shift end by 100.89 minutes.'
-    def constrained_timeline(seed, injections, source=None):
-        result = timeline(seed, injections, source)
+    def constrained_timeline(seed, injections, source=None, shift_hours=4, vehicle="moto"):
+        result = timeline(seed, injections, source, shift_hours, vehicle)
         smart = result['agents']['smart']['decisions']['ONE']
         smart.update(decision='SKIP', binding_constraint='shift_end_infeasible',
                      reason='Skipped: shift_end_infeasible; estimated completion is 100.89 minutes after shift end, including existing work.')

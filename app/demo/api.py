@@ -3,6 +3,7 @@ from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, ConfigDict, Field
+from app.models.common import Vehicle
 
 router = APIRouter(prefix="/demo")
 
@@ -11,6 +12,7 @@ class Start(BaseModel):
     model_config = ConfigDict(extra="forbid")
     seed: int = Field(default=202635, ge=0, le=2**31-1, strict=True)
     shift_hours: int = Field(default=4, ge=1, le=8, strict=True)
+    vehicle: Vehicle = "moto"
 
 
 class Control(BaseModel):
@@ -34,7 +36,7 @@ def session(request, identifier):
 @router.post("/simulations", status_code=202)
 async def start(body: Start, request: Request):
     try:
-        return request.app.state.demo.create(body.seed, body.shift_hours).state()
+        return request.app.state.demo.create(body.seed, body.shift_hours, body.vehicle).state()
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from exc
 

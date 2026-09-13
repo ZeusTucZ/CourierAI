@@ -1,4 +1,4 @@
-import type { AgentKey, Decision, SimulationState, ZoneCollection, Shock } from '../types'
+import type { AgentKey, Decision, SimulationState, Vehicle, ZoneCollection, Shock } from '../types'
 
 // Empty in local development, where Vite proxies requests to FastAPI. Set this
 // to the public API URL in Vercel (for example https://courier-api.onrender.com).
@@ -14,7 +14,7 @@ async function request<T>(path: string, data?: object): Promise<T> {
 }
 export const api = {
   zones: () => request<ZoneCollection>('/geospatial/zones'),
-  start: (seed: number, shift_hours: number) => request<SimulationState>('/demo/simulations', { seed, shift_hours }),
+  start: (seed: number, shift_hours: number, vehicle: Vehicle) => request<SimulationState>('/demo/simulations', { seed, shift_hours, vehicle }),
   state: (id: string) => request<SimulationState>(`/demo/simulations/${id}`),
   control: (id: string, action: string, speed?: number) => request<SimulationState>(`/demo/simulations/${id}/control`, { action, ...(speed ? { speed } : {}) }),
   inject: (id: string, shock_type: Shock['shock_type']) => request<SimulationState>(`/demo/simulations/${id}/shocks`, { shock_type }),
