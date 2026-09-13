@@ -20,7 +20,7 @@ def compact_graph(directory: Path) -> None:
     directory = Path(directory)
     store = GraphStore.load(directory)
     graph = store.graph
-    zone_nodes = list(dict.fromkeys(store.snaps[zone] for zone in sorted(store.snaps)))
+    zone_nodes = list(dict.fromkeys(store.snaps[zone]["node"] for zone in sorted(store.snaps)))
     retained_edges: set[tuple[int, int, int | str]] = set()
 
     for origin in zone_nodes:
