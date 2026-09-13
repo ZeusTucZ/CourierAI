@@ -45,14 +45,19 @@ def compact_graph(directory: Path) -> None:
     ox.save_graphml(compact, temporary)
     metadata_path = directory / "metadata.json"
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    graph_version = sha256(temporary.read_bytes()).hexdigest()
     metadata.update({
-        "graph_version": sha256(temporary.read_bytes()).hexdigest(),
+        "graph_version": graph_version,
         "node_count": len(compact),
         "edge_count": compact.number_of_edges(),
         "runtime_scope": "representative shortest paths between all configured zones",
     })
     temporary.replace(output)
     metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    snaps_path = directory / "zone_nodes.json"
+    snaps = json.loads(snaps_path.read_text(encoding="utf-8"))
+    snaps["graph_version"] = graph_version
+    snaps_path.write_text(json.dumps(snaps, indent=2), encoding="utf-8")
 
 
 def main() -> None:
